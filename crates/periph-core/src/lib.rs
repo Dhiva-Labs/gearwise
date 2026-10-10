@@ -16,7 +16,9 @@ pub mod model;
 pub mod profile;
 pub mod transport;
 
-pub use device::{Capabilities, Device, DeviceDescriptor, DeviceEvent, DeviceState, Driver, Setting};
+pub use device::{
+    Capabilities, Device, DeviceDescriptor, DeviceEvent, DeviceState, Driver, Setting,
+};
 pub use error::{Error, Result};
 pub use manager::{DeviceManager, ScanIssue, ScanReport};
 pub use transport::{HidBackend, HidInterfaceInfo, HidTransport};

@@ -26,7 +26,12 @@ pub struct Profile {
 
 impl Profile {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { id: new_id("p"), name: name.into(), devices: BTreeMap::new(), apps: Vec::new() }
+        Self {
+            id: new_id("p"),
+            name: name.into(),
+            devices: BTreeMap::new(),
+            apps: Vec::new(),
+        }
     }
 }
 
@@ -56,7 +61,10 @@ pub enum MacroStep {
     KeyDown(u8),
     KeyUp(u8),
     /// Press and release, with modifiers held around it.
-    KeyTap { usage: u8, mods: Modifiers },
+    KeyTap {
+        usage: u8,
+        mods: Modifiers,
+    },
     MouseDown(MouseButton),
     MouseUp(MouseButton),
     /// Wait, in milliseconds.
@@ -71,9 +79,11 @@ impl MacroStep {
         match self {
             MacroStep::KeyDown(u) => format!("↓ {}", key(u)),
             MacroStep::KeyUp(u) => format!("↑ {}", key(u)),
-            MacroStep::KeyTap { usage, mods } => {
-                ButtonAction::Key { usage: *usage, mods: *mods }.label()
+            MacroStep::KeyTap { usage, mods } => ButtonAction::Key {
+                usage: *usage,
+                mods: *mods,
             }
+            .label(),
             MacroStep::MouseDown(b) => format!("↓ {}", b.name()),
             MacroStep::MouseUp(b) => format!("↑ {}", b.name()),
             MacroStep::Delay(ms) => format!("Wait {ms} ms"),
@@ -92,14 +102,25 @@ pub struct Macro {
 
 impl Macro {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { id: new_id("m"), name: name.into(), mode: MacroMode::Once, steps: Vec::new() }
+        Self {
+            id: new_id("m"),
+            name: name.into(),
+            mode: MacroMode::Once,
+            steps: Vec::new(),
+        }
     }
 
     /// Total scripted delay, for display.
     pub fn duration_ms(&self) -> u64 {
         self.steps
             .iter()
-            .map(|s| if let MacroStep::Delay(d) = s { *d as u64 } else { 0 })
+            .map(|s| {
+                if let MacroStep::Delay(d) = s {
+                    *d as u64
+                } else {
+                    0
+                }
+            })
             .sum()
     }
 }
@@ -123,7 +144,12 @@ pub struct Preferences {
 
 impl Default for Preferences {
     fn default() -> Self {
-        Self { theme: Theme::Dark, accent: "#00d4aa".into(), auto_switch: false, demo_devices: true }
+        Self {
+            theme: Theme::Dark,
+            accent: "#00d4aa".into(),
+            auto_switch: false,
+            demo_devices: true,
+        }
     }
 }
 
@@ -165,7 +191,11 @@ impl Library {
 
     pub fn starter() -> Self {
         let p = Profile::new("Default");
-        Self { active_profile: Some(p.id.clone()), profiles: vec![p], ..Default::default() }
+        Self {
+            active_profile: Some(p.id.clone()),
+            profiles: vec![p],
+            ..Default::default()
+        }
     }
 
     pub fn profile(&self, id: &str) -> Option<&Profile> {
@@ -227,14 +257,21 @@ pub fn settings_from_state(caps: &Capabilities, state: &DeviceState) -> Vec<Sett
     }
     for z in &caps.lighting {
         if let Some(s) = state.lighting.get(&z.id) {
-            out.push(Setting::Lighting { zone: z.id, state: *s });
+            out.push(Setting::Lighting {
+                zone: z.id,
+                state: *s,
+            });
         }
     }
     if caps.per_key.is_some() && !state.per_key.is_empty() {
         out.push(Setting::PerKey(state.per_key.clone()));
     }
     for b in caps.buttons.iter().filter(|b| b.remappable) {
-        let action = state.buttons.get(&b.id).cloned().unwrap_or(ButtonAction::Default);
+        let action = state
+            .buttons
+            .get(&b.id)
+            .cloned()
+            .unwrap_or(ButtonAction::Default);
         out.push(Setting::Button { id: b.id, action });
     }
     if !caps.lift_off.is_empty() {
@@ -260,7 +297,10 @@ pub fn new_id(prefix: &str) -> String {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
     static COUNTER: AtomicU32 = AtomicU32::new(0);
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
     let c = COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("{prefix}{:x}{:03x}", t, c & 0xfff)
 }
@@ -275,7 +315,10 @@ mod tests {
         let mut lib = Library::starter();
         let mut m = Macro::new("Combo");
         m.steps = vec![
-            MacroStep::KeyTap { usage: 0x04, mods: Modifiers(Modifiers::LCTRL) },
+            MacroStep::KeyTap {
+                usage: 0x04,
+                mods: Modifiers(Modifiers::LCTRL),
+            },
             MacroStep::Delay(50),
             MacroStep::Text("gg".into()),
         ];
@@ -287,9 +330,17 @@ mod tests {
                 Setting::ReportRate(1000),
                 Setting::Lighting {
                     zone: 0,
-                    state: ZoneState { effect: LightingEffect::Static { color: Rgb::new(1, 2, 3) }, brightness: 80 },
+                    state: ZoneState {
+                        effect: LightingEffect::Static {
+                            color: Rgb::new(1, 2, 3),
+                        },
+                        brightness: 80,
+                    },
                 },
-                Setting::Button { id: 0x52, action: ButtonAction::Macro("m1".into()) },
+                Setting::Button {
+                    id: 0x52,
+                    action: ButtonAction::Macro("m1".into()),
+                },
             ],
         );
         let dir = std::env::temp_dir().join(format!("periph-test-{}", new_id("t")));
@@ -305,7 +356,10 @@ mod tests {
     fn missing_file_gives_starter() {
         let lib = Library::load(Path::new("/nonexistent/periph/library.json")).unwrap();
         assert_eq!(lib.profiles.len(), 1);
-        assert_eq!(lib.active_profile.as_deref(), Some(lib.profiles[0].id.as_str()));
+        assert_eq!(
+            lib.active_profile.as_deref(),
+            Some(lib.profiles[0].id.as_str())
+        );
     }
 
     #[test]

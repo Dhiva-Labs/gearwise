@@ -48,13 +48,21 @@ pub struct DeviceManager {
 
 impl DeviceManager {
     pub fn new(backend: Box<dyn HidBackend>, drivers: Vec<Box<dyn Driver>>) -> Self {
-        Self { backend, drivers, entries: Vec::new(), failed: HashSet::new() }
+        Self {
+            backend,
+            drivers,
+            entries: Vec::new(),
+            failed: HashSet::new(),
+        }
     }
 
     /// Add devices that don't come from enumeration (demo devices).
     pub fn add_virtual(&mut self, devices: Vec<Box<dyn Device>>) -> Vec<String> {
         let ids = devices.iter().map(|d| d.descriptor().id.clone()).collect();
-        self.entries.push(Entry { path: None, devices });
+        self.entries.push(Entry {
+            path: None,
+            devices,
+        });
         ids
     }
 
@@ -73,7 +81,9 @@ impl DeviceManager {
     }
 
     pub fn has_real_devices(&self) -> bool {
-        self.entries.iter().any(|e| e.path.is_some() && !e.devices.is_empty())
+        self.entries
+            .iter()
+            .any(|e| e.path.is_some() && !e.devices.is_empty())
     }
 
     /// Enumerate interfaces, open new ones, drop vanished ones.
@@ -91,14 +101,17 @@ impl DeviceManager {
         // Drop devices whose interface is gone.
         self.entries.retain(|e| match &e.path {
             Some(p) if !present.contains(p.as_str()) => {
-                report.removed.extend(e.devices.iter().map(|d| d.descriptor().id.clone()));
+                report
+                    .removed
+                    .extend(e.devices.iter().map(|d| d.descriptor().id.clone()));
                 false
             }
             _ => true,
         });
         self.failed.retain(|p| present.contains(p.as_str()));
 
-        let mut opened: HashSet<String> = self.entries.iter().filter_map(|e| e.path.clone()).collect();
+        let mut opened: HashSet<String> =
+            self.entries.iter().filter_map(|e| e.path.clone()).collect();
         for iface in &ifaces {
             // Backends may list one path several times (one per top-level
             // collection); open each path once.
@@ -114,11 +127,21 @@ impl DeviceManager {
                 Ok(devices) if devices.is_empty() => {}
                 Ok(devices) => {
                     for d in &devices {
-                        log::info!("{}: opened {} ({})", driver.name(), d.descriptor().name, iface.path);
+                        log::info!(
+                            "{}: opened {} ({})",
+                            driver.name(),
+                            d.descriptor().name,
+                            iface.path
+                        );
                     }
-                    report.added.extend(devices.iter().map(|d| d.descriptor().id.clone()));
+                    report
+                        .added
+                        .extend(devices.iter().map(|d| d.descriptor().id.clone()));
                     opened.insert(iface.path.clone());
-                    self.entries.push(Entry { path: Some(iface.path.clone()), devices });
+                    self.entries.push(Entry {
+                        path: Some(iface.path.clone()),
+                        devices,
+                    });
                 }
                 Err(e) => {
                     log::warn!("{}: cannot open {}: {e}", driver.name(), iface.path);
@@ -131,7 +154,9 @@ impl DeviceManager {
     }
 
     pub fn devices(&self) -> impl Iterator<Item = &dyn Device> {
-        self.entries.iter().flat_map(|e| e.devices.iter().map(|d| d.as_ref()))
+        self.entries
+            .iter()
+            .flat_map(|e| e.devices.iter().map(|d| d.as_ref()))
     }
 
     pub fn devices_mut(&mut self) -> impl Iterator<Item = &mut Box<dyn Device>> {
@@ -148,7 +173,8 @@ impl DeviceManager {
         for e in &mut self.entries {
             e.devices.retain(|d| d.descriptor().id != id);
         }
-        self.entries.retain(|e| e.path.is_none() || !e.devices.is_empty());
+        self.entries
+            .retain(|e| e.path.is_none() || !e.devices.is_empty());
     }
 }
 
@@ -183,25 +209,36 @@ mod tests {
         fn probe(&self, iface: &HidInterfaceInfo) -> bool {
             iface.vendor_id == 0x1234
         }
-        fn open(&self, iface: &HidInterfaceInfo, backend: &dyn HidBackend) -> Result<Vec<Box<dyn Device>>> {
+        fn open(
+            &self,
+            iface: &HidInterfaceInfo,
+            backend: &dyn HidBackend,
+        ) -> Result<Vec<Box<dyn Device>>> {
             backend.open(&iface.path)?;
             Ok(vec![demo::devices().remove(0)])
         }
     }
 
     fn iface(path: &str, vid: u16) -> HidInterfaceInfo {
-        HidInterfaceInfo { path: path.into(), vendor_id: vid, ..Default::default() }
+        HidInterfaceInfo {
+            path: path.into(),
+            vendor_id: vid,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn scan_opens_matching_and_reports_permission_issues() {
-        let backend = MockBackend::new(vec![iface("a", 0x1234), iface("b", 0x1234), iface("c", 0x9999)], |p| {
-            if p == "b" {
-                Err(Error::PermissionDenied(p.into()))
-            } else {
-                Ok(Box::new(MockTransport::new(|_| MockReply::none())))
-            }
-        });
+        let backend = MockBackend::new(
+            vec![iface("a", 0x1234), iface("b", 0x1234), iface("c", 0x9999)],
+            |p| {
+                if p == "b" {
+                    Err(Error::PermissionDenied(p.into()))
+                } else {
+                    Ok(Box::new(MockTransport::new(|_| MockReply::none())))
+                }
+            },
+        );
         let mut m = DeviceManager::new(Box::new(backend), vec![Box::new(OneShot)]);
         let r = m.scan();
         assert_eq!(r.added.len(), 1);
@@ -220,7 +257,11 @@ mod tests {
         struct Toggle(Arc<Mutex<bool>>);
         impl HidBackend for Toggle {
             fn enumerate(&self) -> Result<Vec<HidInterfaceInfo>> {
-                Ok(if *self.0.lock().unwrap() { vec![iface("a", 0x1234)] } else { vec![] })
+                Ok(if *self.0.lock().unwrap() {
+                    vec![iface("a", 0x1234)]
+                } else {
+                    vec![]
+                })
             }
             fn open(&self, _: &str) -> Result<Box<dyn HidTransport>> {
                 Ok(Box::new(MockTransport::new(|_| MockReply::none())))

@@ -251,12 +251,25 @@ pub enum WaveDirection {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LightingEffect {
     Off,
-    Static { color: Rgb },
-    Breathing { color: Rgb, period_ms: u16 },
-    ColorCycle { period_ms: u16 },
-    Wave { period_ms: u16, direction: WaveDirection },
+    Static {
+        color: Rgb,
+    },
+    Breathing {
+        color: Rgb,
+        period_ms: u16,
+    },
+    ColorCycle {
+        period_ms: u16,
+    },
+    Wave {
+        period_ms: u16,
+        direction: WaveDirection,
+    },
     /// Keys light up when pressed and fade out.
-    Reactive { color: Rgb, duration_ms: u16 },
+    Reactive {
+        color: Rgb,
+        duration_ms: u16,
+    },
 }
 
 impl LightingEffect {
@@ -277,13 +290,19 @@ impl LightingEffect {
         match kind {
             EffectKind::Off => LightingEffect::Off,
             EffectKind::Static => LightingEffect::Static { color },
-            EffectKind::Breathing => LightingEffect::Breathing { color, period_ms: 4000 },
+            EffectKind::Breathing => LightingEffect::Breathing {
+                color,
+                period_ms: 4000,
+            },
             EffectKind::ColorCycle => LightingEffect::ColorCycle { period_ms: 10_000 },
             EffectKind::Wave => LightingEffect::Wave {
                 period_ms: 3000,
                 direction: WaveDirection::LeftToRight,
             },
-            EffectKind::Reactive => LightingEffect::Reactive { color, duration_ms: 500 },
+            EffectKind::Reactive => LightingEffect::Reactive {
+                color,
+                duration_ms: 500,
+            },
         }
     }
 
@@ -445,7 +464,10 @@ pub enum ButtonAction {
     Disabled,
     Mouse(MouseButton),
     /// Keystroke: HID keyboard usage (page 0x07) plus modifiers.
-    Key { usage: u8, mods: Modifiers },
+    Key {
+        usage: u8,
+        mods: Modifiers,
+    },
     /// HID consumer usage (page 0x0C).
     Media(u16),
     Dpi(DpiFunction),

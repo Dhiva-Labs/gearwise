@@ -102,10 +102,16 @@ impl MockReply {
         Self::default()
     }
     pub fn input(report: Vec<u8>) -> Self {
-        Self { input_reports: vec![report], feature: None }
+        Self {
+            input_reports: vec![report],
+            feature: None,
+        }
     }
     pub fn feature(report: Vec<u8>) -> Self {
-        Self { input_reports: vec![], feature: Some(report) }
+        Self {
+            input_reports: vec![],
+            feature: Some(report),
+        }
     }
 }
 
@@ -151,7 +157,10 @@ impl MockTransport {
 
 impl HidTransport for MockTransport {
     fn write(&mut self, data: &[u8]) -> Result<usize> {
-        self.log.lock().unwrap().push(MockRecord::Write(data.to_vec()));
+        self.log
+            .lock()
+            .unwrap()
+            .push(MockRecord::Write(data.to_vec()));
         let reply = (self.responder)(MockOp::Write(data));
         self.absorb(reply);
         Ok(data.len())
@@ -169,7 +178,10 @@ impl HidTransport for MockTransport {
     }
 
     fn send_feature_report(&mut self, data: &[u8]) -> Result<()> {
-        self.log.lock().unwrap().push(MockRecord::SetFeature(data.to_vec()));
+        self.log
+            .lock()
+            .unwrap()
+            .push(MockRecord::SetFeature(data.to_vec()));
         let reply = (self.responder)(MockOp::SetFeature(data));
         self.absorb(reply);
         Ok(())
@@ -202,7 +214,10 @@ impl MockBackend {
         interfaces: Vec<HidInterfaceInfo>,
         factory: impl Fn(&str) -> Result<Box<dyn HidTransport>> + Send + Sync + 'static,
     ) -> Self {
-        Self { interfaces, factory: Box::new(factory) }
+        Self {
+            interfaces,
+            factory: Box::new(factory),
+        }
     }
 }
 

@@ -82,10 +82,16 @@ pub enum Setting {
     /// Switch the active stage only.
     DpiActiveStage(u8),
     ReportRate(u16),
-    Lighting { zone: u8, state: ZoneState },
+    Lighting {
+        zone: u8,
+        state: ZoneState,
+    },
     /// Per-key colors; keys not listed keep their color.
     PerKey(BTreeMap<u16, Rgb>),
-    Button { id: u16, action: ButtonAction },
+    Button {
+        id: u16,
+        action: ButtonAction,
+    },
     OnboardProfile(u8),
     LiftOff(u8),
     AngleSnapping(bool),
@@ -192,5 +198,9 @@ pub trait Driver: Send + Sync {
 
     /// Open the interface and return the devices behind it. A receiver may
     /// return several (or none, if nothing paired is awake).
-    fn open(&self, iface: &HidInterfaceInfo, backend: &dyn HidBackend) -> Result<Vec<Box<dyn Device>>>;
+    fn open(
+        &self,
+        iface: &HidInterfaceInfo,
+        backend: &dyn HidBackend,
+    ) -> Result<Vec<Box<dyn Device>>>;
 }
