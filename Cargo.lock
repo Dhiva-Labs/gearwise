@@ -1660,6 +1660,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "periph-core",
+ "periph-hid",
 ]
 
 [[package]]
@@ -1694,6 +1695,14 @@ dependencies = [
 
 [[package]]
 name = "periph-razer"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "periph-core",
+]
+
+[[package]]
+name = "periph-steelseries"
 version = "0.1.0"
 dependencies = [
  "log",

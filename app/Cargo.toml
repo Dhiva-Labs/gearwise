@@ -1,8 +1,20 @@
 [package]
 name = "periph-studio"
+description = "Lightweight configuration app for Logitech, Razer and Corsair mice and keyboards"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version = "1.95"
+
+[[bin]]
+name = "periph-studio"
+path = "src/main.rs"
 
 [dependencies]
 periph-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+egui = { version = "0.36", default-features = false }
+eframe = { version = "0.36", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
