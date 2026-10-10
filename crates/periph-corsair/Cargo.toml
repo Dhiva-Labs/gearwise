@@ -8,3 +8,6 @@ rust-version.workspace = true
 [dependencies]
 periph-core.workspace = true
 log.workspace = true
+
+[dev-dependencies]
+periph-hid.workspace = true
