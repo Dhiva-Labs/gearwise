@@ -1,6 +1,9 @@
 //! Assignments tab: device art with clickable hotspots, the button list and the action picker.
 
-use egui::{Align, CornerRadius, FontId, Frame, Layout, Margin, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{
+    Align, CornerRadius, FontId, Frame, Layout, Margin, Rect, Sense, Stroke, StrokeKind, Ui, pos2,
+    vec2,
+};
 use periph_core::device::Setting;
 use periph_core::keys::{self, KeyboardLayout};
 use periph_core::model::{ButtonAction, ButtonCaps, DeviceKind};
@@ -11,7 +14,7 @@ use super::picker::{self, Cat};
 use crate::icons::{self, Icon};
 use crate::illustration::callouts::{self, Callout};
 use crate::illustration::headset::paint_headset;
-use crate::illustration::{self, Kind, KeyPaint, MouseArt, MouseLook};
+use crate::illustration::{self, KeyPaint, Kind, MouseArt, MouseLook};
 use crate::keymap::{Chord, KeyEv};
 use crate::state::{Action, DeviceView};
 use crate::theme::{Palette, mix, palette, with_alpha};
@@ -40,11 +43,24 @@ impl AssignState {
     }
 }
 
-pub fn show(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library, keys: &[KeyEv], out: &mut Vec<Action>) {
+pub fn show(
+    ui: &mut Ui,
+    st: &mut AssignState,
+    dev: &DeviceView,
+    lib: &Library,
+    keys: &[KeyEv],
+    out: &mut Vec<Action>,
+) {
     if st.device != dev.desc.id {
-        *st = AssignState { device: dev.desc.id.clone(), ..Default::default() };
+        *st = AssignState {
+            device: dev.desc.id.clone(),
+            ..Default::default()
+        };
     }
-    if st.selected.is_none_or(|id| !dev.caps.buttons.iter().any(|b| b.id == id)) {
+    if st
+        .selected
+        .is_none_or(|id| !dev.caps.buttons.iter().any(|b| b.id == id))
+    {
         st.selected = dev.caps.buttons.iter().find(|b| b.remappable).map(|b| b.id);
     }
     st.hover_seen = st.hover_now.take();
@@ -73,12 +89,25 @@ pub fn show(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library, 
         ui,
         0.62,
         |ui| illustration_panel(ui, &mut st.borrow_mut(), dev, lib),
-        |ui| button_list(ui, &mut st.borrow_mut(), dev, lib, keys, &mut out.borrow_mut()),
+        |ui| {
+            button_list(
+                ui,
+                &mut st.borrow_mut(),
+                dev,
+                lib,
+                keys,
+                &mut out.borrow_mut(),
+            )
+        },
     );
 }
 
 fn action_of(dev: &DeviceView, b: &ButtonCaps) -> ButtonAction {
-    dev.state.buttons.get(&b.id).cloned().unwrap_or(ButtonAction::Default)
+    dev.state
+        .buttons
+        .get(&b.id)
+        .cloned()
+        .unwrap_or(ButtonAction::Default)
 }
 
 fn illustration_panel(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library) {
@@ -87,13 +116,20 @@ fn illustration_panel(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: 
         DeviceKind::Mouse => mouse_art(ui, st, dev, lib),
         DeviceKind::Headset => {
             let pal = palette(ui.ctx());
-            let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 360.0), Sense::hover());
+            let (area, _) =
+                ui.allocate_exact_size(vec2(ui.available_width(), 360.0), Sense::hover());
             paint_headset(ui.painter(), area.shrink(20.0), &pal, &MouseLook::default());
         }
         kind => {
             let pal = palette(ui.ctx());
-            let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 300.0), Sense::hover());
-            icons::paint(ui.painter(), icons::square(area.center(), 120.0), Icon::of(kind), with_alpha(pal.muted, 120));
+            let (area, _) =
+                ui.allocate_exact_size(vec2(ui.available_width(), 300.0), Sense::hover());
+            icons::paint(
+                ui.painter(),
+                icons::square(area.center(), 120.0),
+                Icon::of(kind),
+                with_alpha(pal.muted, 120),
+            );
         }
     }
 }
@@ -115,7 +151,13 @@ fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library)
         .iter()
         .filter_map(|pl| {
             let role = pl.role?;
-            let strength = if st.selected == Some(pl.id) { 1.0 } else if st.hover_seen == Some(pl.id) { 0.7 } else { return None };
+            let strength = if st.selected == Some(pl.id) {
+                1.0
+            } else if st.hover_seen == Some(pl.id) {
+                0.7
+            } else {
+                return None;
+            };
             Some((role, strength))
         })
         .collect();
@@ -154,15 +196,29 @@ fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library)
     }
     let unplaced = dev.caps.buttons.len() - placed.len();
     if unplaced > 0 {
-        widgets::caption(ui, format!("{unplaced} more button{} listed on the right", if unplaced == 1 { "" } else { "s" }));
+        widgets::caption(
+            ui,
+            format!(
+                "{unplaced} more button{} listed on the right",
+                if unplaced == 1 { "" } else { "s" }
+            ),
+        );
     }
 }
 
 fn keyboard_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library) {
     let pal = palette(ui.ctx());
-    let extras: Vec<&ButtonCaps> = dev.caps.buttons.iter().filter(|b| b.hotspot.is_none() && !dev.caps.per_key.as_ref().is_some_and(|l| l.contains(b.id))).collect();
+    let extras: Vec<&ButtonCaps> = dev
+        .caps
+        .buttons
+        .iter()
+        .filter(|b| {
+            b.hotspot.is_none() && !dev.caps.per_key.as_ref().is_some_and(|l| l.contains(b.id))
+        })
+        .collect();
     let extra_h = if extras.is_empty() { 0.0 } else { 70.0 };
-    let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 300.0 + extra_h), Sense::hover());
+    let (area, _) =
+        ui.allocate_exact_size(vec2(ui.available_width(), 300.0 + extra_h), Sense::hover());
     let id = ui.id().with("art");
     let mut hovered: Option<(Rect, String)> = None;
 
@@ -172,17 +228,30 @@ fn keyboard_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Libra
     illustration::paint_chassis(ui.painter(), &g, &pal);
     for cell in &layout.keys {
         let r = illustration::key_rect(&g, cell);
-        match dev.caps.buttons.iter().find(|b| b.id == cell.id && b.remappable) {
+        match dev
+            .caps
+            .buttons
+            .iter()
+            .find(|b| b.id == cell.id && b.remappable)
+        {
             Some(b) => {
                 let resp = ui.interact(r, id.with(b.id), Sense::click());
-                let paint = key_paint(&pal, st.selected == Some(b.id), resp.hovered() || st.hover_seen == Some(b.id), action_of(dev, b) != ButtonAction::Default);
+                let paint = key_paint(
+                    &pal,
+                    st.selected == Some(b.id),
+                    resp.hovered() || st.hover_seen == Some(b.id),
+                    action_of(dev, b) != ButtonAction::Default,
+                );
                 illustration::paint_key(ui.painter(), r, &cell.label, paint, g.unit);
                 if resp.clicked() {
                     st.selected = Some(b.id);
                 }
                 if resp.hovered() {
                     st.hover_now = Some(b.id);
-                    hovered = Some((r, format!("{} · {}", b.name, action_label(&action_of(dev, b), lib))));
+                    hovered = Some((
+                        r,
+                        format!("{} · {}", b.name, action_label(&action_of(dev, b), lib)),
+                    ));
                 }
             }
             None => {
@@ -202,14 +271,22 @@ fn keyboard_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Libra
         let r = Rect::from_min_size(pos2(x, g.chassis.max.y + 18.0), vec2(58.0, 38.0));
         x += 66.0;
         let resp = ui.interact(r, id.with(b.id), Sense::click());
-        let paint = key_paint(&pal, st.selected == Some(b.id), resp.hovered() || st.hover_seen == Some(b.id), action_of(dev, b) != ButtonAction::Default);
+        let paint = key_paint(
+            &pal,
+            st.selected == Some(b.id),
+            resp.hovered() || st.hover_seen == Some(b.id),
+            action_of(dev, b) != ButtonAction::Default,
+        );
         illustration::paint_key(ui.painter(), r, &b.name, paint, 40.0);
         if resp.clicked() {
             st.selected = Some(b.id);
         }
         if resp.hovered() {
             st.hover_now = Some(b.id);
-            hovered = Some((r, format!("{} · {}", b.name, action_label(&action_of(dev, b), lib))));
+            hovered = Some((
+                r,
+                format!("{} · {}", b.name, action_label(&action_of(dev, b), lib)),
+            ));
         }
     }
     if let Some((anchor, text)) = hovered {
@@ -218,11 +295,27 @@ fn keyboard_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Libra
 }
 
 fn key_paint(pal: &Palette, selected: bool, hovered: bool, assigned: bool) -> KeyPaint {
-    let base = if assigned { mix(pal.raised, pal.accent, 0.28) } else { mix(pal.raised, pal.text, 0.04) };
+    let base = if assigned {
+        mix(pal.raised, pal.accent, 0.28)
+    } else {
+        mix(pal.raised, pal.text, 0.04)
+    };
     KeyPaint {
-        fill: if hovered { mix(base, pal.accent, 0.25) } else { base },
-        label: if selected { pal.accent_text() } else { pal.text },
-        stroke: if selected { Stroke::new(2.0, pal.accent) } else { Stroke::new(1.0, mix(pal.border, pal.accent, 0.5)) },
+        fill: if hovered {
+            mix(base, pal.accent, 0.25)
+        } else {
+            base
+        },
+        label: if selected {
+            pal.accent_text()
+        } else {
+            pal.text
+        },
+        stroke: if selected {
+            Stroke::new(2.0, pal.accent)
+        } else {
+            Stroke::new(1.0, mix(pal.border, pal.accent, 0.5))
+        },
         glow: None,
     }
 }
@@ -234,19 +327,43 @@ fn label_bubble(ui: &Ui, bounds: Rect, anchor: Rect, text: &str, pal: &Palette) 
     let mut x = anchor.center().x - size.x / 2.0;
     x = x.clamp(bounds.min.x, (bounds.max.x - size.x).max(bounds.min.x));
     let above = anchor.min.y - size.y - 6.0 >= bounds.min.y;
-    let y = if above { anchor.min.y - size.y - 6.0 } else { anchor.max.y + 6.0 };
+    let y = if above {
+        anchor.min.y - size.y - 6.0
+    } else {
+        anchor.max.y + 6.0
+    };
     let r = Rect::from_min_size(pos2(x, y), size);
-    p.rect(r, CornerRadius::same(8), pal.raised, Stroke::new(1.0, pal.accent), StrokeKind::Inside);
+    p.rect(
+        r,
+        CornerRadius::same(8),
+        pal.raised,
+        Stroke::new(1.0, pal.accent),
+        StrokeKind::Inside,
+    );
     p.galley(r.min + vec2(9.0, 6.0), galley, pal.text);
 }
 
-fn button_list(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library, keys: &[KeyEv], out: &mut Vec<Action>) {
+fn button_list(
+    ui: &mut Ui,
+    st: &mut AssignState,
+    dev: &DeviceView,
+    lib: &Library,
+    keys: &[KeyEv],
+    out: &mut Vec<Action>,
+) {
     let pal = palette(ui.ctx());
     ui.horizontal(|ui| {
         widgets::subtitle(ui, "Buttons");
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let n = dev.state.buttons.len();
-            widgets::caption(ui, if n == 0 { "All default".to_string() } else { format!("{n} customised") });
+            widgets::caption(
+                ui,
+                if n == 0 {
+                    "All default".to_string()
+                } else {
+                    format!("{n} customised")
+                },
+            );
         });
     });
     ui.add_space(4.0);
@@ -261,14 +378,24 @@ fn button_list(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Librar
         }
         let p = ui.painter();
         if selected {
-            p.rect(rect, CornerRadius::same(9), pal.accent_soft, Stroke::new(1.0, pal.accent), StrokeKind::Inside);
+            p.rect(
+                rect,
+                CornerRadius::same(9),
+                pal.accent_soft,
+                Stroke::new(1.0, pal.accent),
+                StrokeKind::Inside,
+            );
         } else if hot {
             p.rect_filled(rect, CornerRadius::same(9), pal.raised);
         }
         let name_color = if b.remappable { pal.text } else { pal.muted };
         let max_name = rect.width() * 0.5 - 16.0;
         let g = widgets::fit_text(p, &b.name, FontId::proportional(14.0), name_color, max_name);
-        p.galley(pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0), g, name_color);
+        p.galley(
+            pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0),
+            g,
+            name_color,
+        );
         let (label, color) = if !b.remappable {
             ("Fixed".to_string(), pal.muted)
         } else if action == ButtonAction::Default {
@@ -276,8 +403,21 @@ fn button_list(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Librar
         } else {
             (action_label(&action, lib), pal.accent_text())
         };
-        let g = widgets::fit_text(p, &label, FontId::proportional(13.0), color, rect.width() * 0.5 - 14.0);
-        p.galley(pos2(rect.max.x - 12.0 - g.size().x, rect.center().y - g.size().y / 2.0), g, color);
+        let g = widgets::fit_text(
+            p,
+            &label,
+            FontId::proportional(13.0),
+            color,
+            rect.width() * 0.5 - 14.0,
+        );
+        p.galley(
+            pos2(
+                rect.max.x - 12.0 - g.size().x,
+                rect.center().y - g.size().y / 2.0,
+            ),
+            g,
+            color,
+        );
         if resp.clicked() && b.remappable {
             st.selected = if selected { None } else { Some(b.id) };
         }
@@ -301,5 +441,9 @@ fn button_list(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Librar
 
 /// Apply `action` to the button.
 pub fn assign(dev: &DeviceView, b: &ButtonCaps, action: ButtonAction, out: &mut Vec<Action>) {
-    out.push(Action::Apply { dev: dev.desc.id.clone(), setting: Setting::Button { id: b.id, action }, debounce: false });
+    out.push(Action::Apply {
+        dev: dev.desc.id.clone(),
+        setting: Setting::Button { id: b.id, action },
+        debounce: false,
+    });
 }

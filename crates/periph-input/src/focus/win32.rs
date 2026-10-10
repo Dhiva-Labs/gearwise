@@ -49,7 +49,10 @@ mod tests {
 
     #[test]
     fn base_name_keeps_the_last_path_component_in_lowercase() {
-        assert_eq!(base_name(r"C:\Games\Foo\Game.EXE").as_deref(), Some("game.exe"));
+        assert_eq!(
+            base_name(r"C:\Games\Foo\Game.EXE").as_deref(),
+            Some("game.exe")
+        );
         assert_eq!(base_name("notepad.exe").as_deref(), Some("notepad.exe"));
         assert_eq!(base_name(""), None);
     }

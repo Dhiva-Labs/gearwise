@@ -4,10 +4,14 @@
 use std::f32::consts::PI;
 
 use egui::epaint::{Mesh, PathStroke, Vertex, WHITE_UV};
-use egui::{Align2, Color32, CornerRadius, FontId, Painter, Pos2, Shape, Stroke, StrokeKind, pos2, vec2};
+use egui::{
+    Align2, Color32, CornerRadius, FontId, Painter, Pos2, Shape, Stroke, StrokeKind, pos2, vec2,
+};
 
 use super::mouse::{Geo, Kind, MouseArt, MouseLook, Role, ZoneRole, seam_t};
-use super::shapes::{centroid, convex_hull, glow, glow_line, gradient_fan, rounded_poly, seam, vertical_fan};
+use super::shapes::{
+    centroid, convex_hull, glow, glow_line, gradient_fan, rounded_poly, seam, vertical_fan,
+};
 use crate::theme::{Palette, mix, with_alpha};
 
 impl MouseArt {
@@ -22,8 +26,15 @@ impl MouseArt {
         for i in 1..=5 {
             let k = i as f32;
             let c = self.rect.center();
-            let pts: Vec<Pos2> = shape.iter().map(|q| pos2(q.x, q.y + 9.0) + (*q - c) * (0.012 * k)).collect();
-            p.add(Shape::convex_polygon(pts, Color32::from_black_alpha(if pal.dark { 20 } else { 8 }), Stroke::NONE));
+            let pts: Vec<Pos2> = shape
+                .iter()
+                .map(|q| pos2(q.x, q.y + 9.0) + (*q - c) * (0.012 * k))
+                .collect();
+            p.add(Shape::convex_polygon(
+                pts,
+                Color32::from_black_alpha(if pal.dark { 20 } else { 8 }),
+                Stroke::NONE,
+            ));
         }
         // Underglow from the body zone.
         if let Some(c) = look.body {
@@ -34,12 +45,22 @@ impl MouseArt {
         p.add(Shape::convex_polygon(shape.clone(), skin.rim, Stroke::NONE));
         let shell = g.inset(3.5);
         p.add(self.dome(&shell, &skin));
-        p.add(Shape::closed_line(shell.outline(), PathStroke::new(1.0, with_alpha(skin.hi, 70))));
+        p.add(Shape::closed_line(
+            shell.outline(),
+            PathStroke::new(1.0, with_alpha(skin.hi, 70)),
+        ));
 
         // Soft specular sheen on the palm.
         let sc = g.pt(0.56, 0.36);
         let radii = vec2(self.rect.width() * 0.2, self.rect.height() * 0.17);
-        let sheen: Vec<Pos2> = (0..32).map(|i| sc + vec2((i as f32 * PI / 16.0).cos() * radii.x, (i as f32 * PI / 16.0).sin() * radii.y)).collect();
+        let sheen: Vec<Pos2> = (0..32)
+            .map(|i| {
+                sc + vec2(
+                    (i as f32 * PI / 16.0).cos() * radii.x,
+                    (i as f32 * PI / 16.0).sin() * radii.y,
+                )
+            })
+            .collect();
         let sheen_alpha = if pal.dark { 40.0 } else { 90.0 };
         p.add(gradient_fan(&sheen, |q| {
             let d = ((q - sc) / radii).length().min(1.0);
@@ -48,28 +69,58 @@ impl MouseArt {
 
         // Palm panel groove and the primary buttons.
         for role in [Role::Left, Role::Right] {
-            let Some(part) = self.part(role) else { continue };
+            let Some(part) = self.part(role) else {
+                continue;
+            };
             p.add(vertical_fan(&part.poly, skin.btn_top, skin.btn_bottom));
-            p.add(Shape::closed_line(part.poly.clone(), PathStroke::new(1.0, skin.groove)));
+            p.add(Shape::closed_line(
+                part.poly.clone(),
+                PathStroke::new(1.0, skin.groove),
+            ));
         }
-        let rear: Vec<Pos2> = (0..=24).map(|i| i as f32 / 24.0).map(|f| g.pt(seam_t(f), f)).collect();
+        let rear: Vec<Pos2> = (0..=24)
+            .map(|i| i as f32 / 24.0)
+            .map(|f| g.pt(seam_t(f), f))
+            .collect();
         seam(p, &rear, skin.groove, with_alpha(skin.hi, 60));
-        seam(p, &[g.pt(0.01, 0.5), g.pt(seam_t(0.5), 0.5)], skin.groove, with_alpha(skin.hi, 50));
+        seam(
+            p,
+            &[g.pt(0.01, 0.5), g.pt(seam_t(0.5), 0.5)],
+            skin.groove,
+            with_alpha(skin.hi, 50),
+        );
 
         // Thumb panel or grid backing.
         if self.kind == Kind::Mmo {
-            let cells: Vec<Pos2> = self.parts.iter().filter(|c| matches!(c.role, Role::Grid(_))).flat_map(|c| c.poly.iter().copied()).collect();
+            let cells: Vec<Pos2> = self
+                .parts
+                .iter()
+                .filter(|c| matches!(c.role, Role::Grid(_)))
+                .flat_map(|c| c.poly.iter().copied())
+                .collect();
             let mid = centroid(&cells);
-            let padded: Vec<Pos2> = cells.iter().map(|q| *q + (*q - mid).normalized() * 6.0).collect();
+            let padded: Vec<Pos2> = cells
+                .iter()
+                .map(|q| *q + (*q - mid).normalized() * 6.0)
+                .collect();
             let panel = convex_hull(&padded);
-            p.add(Shape::convex_polygon(panel.clone(), skin.groove, Stroke::NONE));
-            p.add(Shape::closed_line(panel, PathStroke::new(1.0, with_alpha(skin.hi, 60))));
+            p.add(Shape::convex_polygon(
+                panel.clone(),
+                skin.groove,
+                Stroke::NONE,
+            ));
+            p.add(Shape::closed_line(
+                panel,
+                PathStroke::new(1.0, with_alpha(skin.hi, 60)),
+            ));
         }
 
         // Body-zone light strips along both flanks.
         if let Some(c) = look.body {
             for f in [0.035, 0.965] {
-                let strip: Vec<Pos2> = (0..=24).map(|i| g.pt(0.2 + 0.68 * i as f32 / 24.0, f)).collect();
+                let strip: Vec<Pos2> = (0..=24)
+                    .map(|i| g.pt(0.2 + 0.68 * i as f32 / 24.0, f))
+                    .collect();
                 glow_line(p, &strip, 2.4, c);
             }
         }
@@ -82,16 +133,29 @@ impl MouseArt {
         }
         if let Some(part) = self.part(Role::Profile) {
             self.key(p, &skin, &part.poly);
-            p.circle_filled(part.anchor, self.rect.width() * 0.011, with_alpha(skin.hi, 120));
+            p.circle_filled(
+                part.anchor,
+                self.rect.width() * 0.011,
+                with_alpha(skin.hi, 120),
+            );
         }
         for part in &self.parts {
-            if matches!(part.role, Role::Sniper | Role::Back | Role::Forward | Role::Grid(_)) {
+            if matches!(
+                part.role,
+                Role::Sniper | Role::Back | Role::Forward | Role::Grid(_)
+            ) {
                 self.key(p, &skin, &part.poly);
             }
         }
         for part in &self.parts {
             if let Role::Grid(i) = part.role {
-                p.text(part.anchor, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(9.5), with_alpha(skin.hi, 200));
+                p.text(
+                    part.anchor,
+                    Align2::CENTER_CENTER,
+                    (i + 1).to_string(),
+                    FontId::proportional(9.5),
+                    with_alpha(skin.hi, 200),
+                );
             }
         }
         if let Some(part) = self.part(Role::Sniper) {
@@ -104,16 +168,33 @@ impl MouseArt {
         self.paint_logo(p, &skin, look);
 
         // Rim light along the upper flanks.
-        let hi_l: Vec<Pos2> = (0..=20).map(|i| shell.pt(0.04 + 0.5 * i as f32 / 20.0, 0.0)).collect();
-        let hi_r: Vec<Pos2> = (0..=20).map(|i| shell.pt(0.04 + 0.4 * i as f32 / 20.0, 1.0)).collect();
-        p.add(Shape::line(hi_l, PathStroke::new(1.6, with_alpha(skin.hi, 110))));
-        p.add(Shape::line(hi_r, PathStroke::new(1.2, with_alpha(skin.hi, 55))));
+        let hi_l: Vec<Pos2> = (0..=20)
+            .map(|i| shell.pt(0.04 + 0.5 * i as f32 / 20.0, 0.0))
+            .collect();
+        let hi_r: Vec<Pos2> = (0..=20)
+            .map(|i| shell.pt(0.04 + 0.4 * i as f32 / 20.0, 1.0))
+            .collect();
+        p.add(Shape::line(
+            hi_l,
+            PathStroke::new(1.6, with_alpha(skin.hi, 110)),
+        ));
+        p.add(Shape::line(
+            hi_r,
+            PathStroke::new(1.2, with_alpha(skin.hi, 55)),
+        ));
 
         // Hover / selection tint.
         for (role, strength) in tint {
             if let Some(part) = self.part(*role) {
-                p.add(Shape::convex_polygon(part.poly.clone(), with_alpha(pal.accent, (84.0 * strength) as u8), Stroke::NONE));
-                p.add(Shape::closed_line(part.poly.clone(), PathStroke::new(1.0 + strength, with_alpha(pal.accent, 230))));
+                p.add(Shape::convex_polygon(
+                    part.poly.clone(),
+                    with_alpha(pal.accent, (84.0 * strength) as u8),
+                    Stroke::NONE,
+                ));
+                p.add(Shape::closed_line(
+                    part.poly.clone(),
+                    PathStroke::new(1.0 + strength, with_alpha(pal.accent, 230)),
+                ));
             }
         }
 
@@ -131,7 +212,11 @@ impl MouseArt {
                 let dome = (1.0 - (2.0 * f - 1.0).abs() * 1.0).clamp(0.0, 1.0);
                 let lit = mix(vertical, skin.hi, 0.07 * (1.0 - f) * dome);
                 let color = mix(skin.edge, lit, (dome * 3.2).clamp(0.0, 1.0));
-                mesh.vertices.push(Vertex { pos: geo.pt(t, f), uv: WHITE_UV, color });
+                mesh.vertices.push(Vertex {
+                    pos: geo.pt(t, f),
+                    uv: WHITE_UV,
+                    color,
+                });
             }
         }
         let cols = COLS.len() as u32;
@@ -150,32 +235,69 @@ impl MouseArt {
         let shifted: Vec<Pos2> = poly.iter().map(|q| *q + vec2(0.0, 1.5)).collect();
         p.add(Shape::convex_polygon(shifted, skin.groove, Stroke::NONE));
         p.add(vertical_fan(poly, skin.key_top, skin.key_bottom));
-        p.add(Shape::closed_line(poly.to_vec(), PathStroke::new(1.0, with_alpha(skin.hi, 50))));
+        p.add(Shape::closed_line(
+            poly.to_vec(),
+            PathStroke::new(1.0, with_alpha(skin.hi, 50)),
+        ));
     }
 
     fn paint_wheel(&self, p: &Painter, skin: &Skin, look: &MouseLook) {
         let w = self.wheel;
         let slot = w.expand2(vec2(4.0, 5.0));
-        p.rect_filled(slot, CornerRadius::same((slot.width() / 2.0) as u8), skin.groove);
-        p.rect_stroke(slot, CornerRadius::same((slot.width() / 2.0) as u8), Stroke::new(1.0, with_alpha(skin.hi, 45)), StrokeKind::Outside);
+        p.rect_filled(
+            slot,
+            CornerRadius::same((slot.width() / 2.0) as u8),
+            skin.groove,
+        );
+        p.rect_stroke(
+            slot,
+            CornerRadius::same((slot.width() / 2.0) as u8),
+            Stroke::new(1.0, with_alpha(skin.hi, 45)),
+            StrokeKind::Outside,
+        );
         if let Some(c) = look.wheel {
             glow(p, w.center(), w.width() * 0.4, with_alpha(c, 60));
         }
         let poly = rounded_poly(w, w.width() / 2.0, 6);
         let cx = w.center().x;
         let half = w.width() / 2.0;
-        let centre = look.wheel.map_or(skin.wheel_mid, |c| mix(skin.wheel_mid, c, 0.55));
-        p.add(gradient_fan(&poly, |q| mix(skin.wheel_edge, centre, (1.0 - ((q.x - cx).abs() / half).powi(2)).clamp(0.0, 1.0))));
+        let centre = look
+            .wheel
+            .map_or(skin.wheel_mid, |c| mix(skin.wheel_mid, c, 0.55));
+        p.add(gradient_fan(&poly, |q| {
+            mix(
+                skin.wheel_edge,
+                centre,
+                (1.0 - ((q.x - cx).abs() / half).powi(2)).clamp(0.0, 1.0),
+            )
+        }));
         // Ridges.
         let n = (w.height() / 4.0) as i32;
         for i in 1..n {
             let y = w.min.y + w.height() * i as f32 / n as f32;
-            p.hline(w.min.x + 2.0..=w.max.x - 2.0, y, Stroke::new(1.0, with_alpha(Color32::BLACK, 70)));
-            p.hline(w.min.x + 3.0..=w.max.x - 3.0, y + 1.0, Stroke::new(1.0, with_alpha(skin.hi, 40)));
+            p.hline(
+                w.min.x + 2.0..=w.max.x - 2.0,
+                y,
+                Stroke::new(1.0, with_alpha(Color32::BLACK, 70)),
+            );
+            p.hline(
+                w.min.x + 3.0..=w.max.x - 3.0,
+                y + 1.0,
+                Stroke::new(1.0, with_alpha(skin.hi, 40)),
+            );
         }
         // Highlight stripe.
-        p.vline(cx - half * 0.35, w.min.y + 4.0..=w.max.y - 4.0, Stroke::new(1.2, with_alpha(skin.hi, 70)));
-        p.rect_stroke(w, CornerRadius::same(half as u8), Stroke::new(1.0, with_alpha(Color32::BLACK, 120)), StrokeKind::Inside);
+        p.vline(
+            cx - half * 0.35,
+            w.min.y + 4.0..=w.max.y - 4.0,
+            Stroke::new(1.2, with_alpha(skin.hi, 70)),
+        );
+        p.rect_stroke(
+            w,
+            CornerRadius::same(half as u8),
+            Stroke::new(1.0, with_alpha(Color32::BLACK, 120)),
+            StrokeKind::Inside,
+        );
     }
 
     fn paint_logo(&self, p: &Painter, skin: &Skin, look: &MouseLook) {
@@ -202,10 +324,20 @@ impl MouseArt {
                 p.circle_stroke(self.logo.0, self.logo.1 * 1.9, ring);
             }
             ZoneRole::Wheel => {
-                p.rect_stroke(self.wheel.expand2(vec2(9.0, 10.0)), CornerRadius::same(14), ring, StrokeKind::Outside);
+                p.rect_stroke(
+                    self.wheel.expand2(vec2(9.0, 10.0)),
+                    CornerRadius::same(14),
+                    ring,
+                    StrokeKind::Outside,
+                );
             }
             ZoneRole::Body => {
-                p.extend(Shape::dashed_line(&[shape, &shape[..1]].concat(), ring, 6.0, 5.0));
+                p.extend(Shape::dashed_line(
+                    &[shape, &shape[..1]].concat(),
+                    ring,
+                    6.0,
+                    5.0,
+                ));
             }
         }
     }

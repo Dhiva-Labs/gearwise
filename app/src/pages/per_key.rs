@@ -3,7 +3,9 @@
 use std::collections::BTreeSet;
 
 use egui::color_picker::{Alpha, color_edit_button_srgba};
-use egui::{Color32, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, vec2};
+use egui::{
+    Color32, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, vec2,
+};
 use periph_core::device::Setting;
 use periph_core::keys::{KeyCell, KeyboardLayout};
 use periph_core::model::Rgb;
@@ -55,20 +57,35 @@ impl Default for PerKeyState {
 /// Rainbow across the layout's width.
 pub fn rainbow(layout: &KeyboardLayout) -> std::collections::BTreeMap<u16, Rgb> {
     let w = layout.width().max(1.0);
-    layout.keys.iter().map(|k| (k.id, Rgb::from_hue(300.0 * (k.x + k.w / 2.0) / w))).collect()
+    layout
+        .keys
+        .iter()
+        .map(|k| (k.id, Rgb::from_hue(300.0 * (k.x + k.w / 2.0) / w)))
+        .collect()
 }
 
 /// Keys whose caps intersect `sel`.
 pub fn keys_in_rect(g: &KbGeom, layout: &KeyboardLayout, sel: Rect) -> BTreeSet<u16> {
-    layout.keys.iter().filter(|k| illustration::key_rect(g, k).intersects(sel)).map(|k| k.id).collect()
+    layout
+        .keys
+        .iter()
+        .filter(|k| illustration::key_rect(g, k).intersects(sel))
+        .map(|k| k.id)
+        .collect()
 }
 
 fn key_at<'a>(g: &KbGeom, layout: &'a KeyboardLayout, p: Pos2) -> Option<&'a KeyCell> {
-    layout.keys.iter().find(|k| illustration::key_rect(g, k).expand(g.unit * 0.03).contains(p))
+    layout.keys.iter().find(|k| {
+        illustration::key_rect(g, k)
+            .expand(g.unit * 0.03)
+            .contains(p)
+    })
 }
 
 pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<Action>) {
-    let Some(layout) = dev.caps.per_key.as_ref() else { return };
+    let Some(layout) = dev.caps.per_key.as_ref() else {
+        return;
+    };
     let pal = palette(ui.ctx());
     let id = dev.desc.id.clone();
     let mut painted = std::collections::BTreeMap::new();
@@ -79,7 +96,8 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
         brush_bar(ui, st);
         ui.add_space(8.0);
 
-        let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 300.0), Sense::click_and_drag());
+        let (area, resp) =
+            ui.allocate_exact_size(vec2(ui.available_width(), 300.0), Sense::click_and_drag());
         let g = illustration::keyboard_geom(area, layout);
         let color_of = |k: u16| dev.state.per_key.get(&k).copied().unwrap_or(Rgb::BLACK);
         let shift = ui.input(|i| i.modifiers.shift);
@@ -90,8 +108,15 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
             let origin = ui.input(|i| i.pointer.press_origin()).or(ptr);
             if let Some(o) = origin {
                 if shift && st.tool == Tool::Paint {
-                    st.base_selection = if ui.input(|i| i.modifiers.command) { st.selection.clone() } else { BTreeSet::new() };
-                    st.drag = Some(Drag::Select { start: o, additive: true });
+                    st.base_selection = if ui.input(|i| i.modifiers.command) {
+                        st.selection.clone()
+                    } else {
+                        BTreeSet::new()
+                    };
+                    st.drag = Some(Drag::Select {
+                        start: o,
+                        additive: true,
+                    });
                 } else if st.tool == Tool::Paint {
                     st.drag = Some(Drag::Paint);
                     st.last = Some(o);
@@ -105,18 +130,30 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
                 for i in 1..=steps {
                     let q = from + (p - from) * (i as f32 / steps as f32);
                     if let Some(k) = key_at(&g, layout, q)
-                        && color_of(k.id) != st.brush && painted.get(&k.id) != Some(&st.brush) {
-                            painted.insert(k.id, st.brush);
-                        }
+                        && color_of(k.id) != st.brush
+                        && painted.get(&k.id) != Some(&st.brush)
+                    {
+                        painted.insert(k.id, st.brush);
+                    }
                 }
                 st.last = Some(p);
             }
             (Some(Drag::Select { start, additive }), Some(p)) if resp.dragged() => {
                 let sel = Rect::from_two_pos(start, p);
-                let mut set = if additive { st.base_selection.clone() } else { BTreeSet::new() };
+                let mut set = if additive {
+                    st.base_selection.clone()
+                } else {
+                    BTreeSet::new()
+                };
                 set.extend(keys_in_rect(&g, layout, sel));
                 st.selection = set;
-                ui.painter().rect(sel, CornerRadius::same(4), with_alpha(pal.accent, 30), Stroke::new(1.0, pal.accent), StrokeKind::Inside);
+                ui.painter().rect(
+                    sel,
+                    CornerRadius::same(4),
+                    with_alpha(pal.accent, 30),
+                    Stroke::new(1.0, pal.accent),
+                    StrokeKind::Inside,
+                );
             }
             _ => {}
         }
@@ -128,48 +165,80 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
             st.last = None;
         }
         if resp.clicked()
-            && let Some(k) = ptr.and_then(|p| key_at(&g, layout, p)) {
-                if shift {
-                    if !st.selection.remove(&k.id) {
-                        st.selection.insert(k.id);
-                    }
-                } else if st.tool == Tool::Eyedropper {
-                    st.brush = color_of(k.id);
-                    st.tool = Tool::Paint;
-                } else if color_of(k.id) != st.brush {
-                    painted.insert(k.id, st.brush);
-                    flush = true;
+            && let Some(k) = ptr.and_then(|p| key_at(&g, layout, p))
+        {
+            if shift {
+                if !st.selection.remove(&k.id) {
+                    st.selection.insert(k.id);
                 }
+            } else if st.tool == Tool::Eyedropper {
+                st.brush = color_of(k.id);
+                st.tool = Tool::Paint;
+            } else if color_of(k.id) != st.brush {
+                painted.insert(k.id, st.brush);
+                flush = true;
             }
+        }
 
         // Rendering (uses the optimistic state plus this frame's strokes).
         illustration::paint_chassis(ui.painter(), &g, &pal);
-        let hovered = ptr.filter(|_| resp.hovered() || resp.dragged()).and_then(|p| key_at(&g, layout, p)).map(|k| k.id);
+        let hovered = ptr
+            .filter(|_| resp.hovered() || resp.dragged())
+            .and_then(|p| key_at(&g, layout, p))
+            .map(|k| k.id);
         for cell in &layout.keys {
-            let c = painted.get(&cell.id).copied().unwrap_or_else(|| color_of(cell.id));
+            let c = painted
+                .get(&cell.id)
+                .copied()
+                .unwrap_or_else(|| color_of(cell.id));
             let lit = c != Rgb::BLACK;
             let col = c32(c);
             let selected = st.selection.contains(&cell.id);
             let paint = KeyPaint {
-                fill: if lit { col } else { mix(pal.card, pal.raised, 0.6) },
-                label: if lit { text_on(col) } else { with_alpha(pal.muted, 170) },
+                fill: if lit {
+                    col
+                } else {
+                    mix(pal.card, pal.raised, 0.6)
+                },
+                label: if lit {
+                    text_on(col)
+                } else {
+                    with_alpha(pal.muted, 170)
+                },
                 stroke: if selected {
                     Stroke::new(2.0, pal.accent)
                 } else if hovered == Some(cell.id) {
                     Stroke::new(1.5, pal.text)
                 } else {
-                    Stroke::new(1.0, if lit { with_alpha(Color32::BLACK, 70) } else { with_alpha(pal.border, 200) })
+                    Stroke::new(
+                        1.0,
+                        if lit {
+                            with_alpha(Color32::BLACK, 70)
+                        } else {
+                            with_alpha(pal.border, 200)
+                        },
+                    )
                 },
                 glow: lit.then_some(col),
             };
-            illustration::paint_key(ui.painter(), illustration::key_rect(&g, cell), &cell.label, paint, g.unit);
+            illustration::paint_key(
+                ui.painter(),
+                illustration::key_rect(&g, cell),
+                &cell.label,
+                paint,
+                g.unit,
+            );
         }
         ui.add_space(10.0);
         tools(ui, st, layout, &mut painted, &mut flush);
     });
 
     if !painted.is_empty() || flush {
-        out.push(Action::Apply { dev: id, setting: Setting::PerKey(painted), debounce: !flush });
+        out.push(Action::Apply {
+            dev: id,
+            setting: Setting::PerKey(painted),
+            debounce: !flush,
+        });
     }
 }
 
@@ -185,13 +254,31 @@ fn brush_bar(ui: &mut Ui, st: &mut PerKeyState) {
         if !editing {
             st.hex = st.brush.to_hex();
         }
-        let r = ui.add(TextEdit::singleline(&mut st.hex).id(ui.id().with("brush-hex")).desired_width(76.0).font(FontId::monospace(13.0)));
+        let r = ui.add(
+            TextEdit::singleline(&mut st.hex)
+                .id(ui.id().with("brush-hex"))
+                .desired_width(76.0)
+                .font(FontId::monospace(13.0)),
+        );
         if r.changed()
-            && let Some(c) = Rgb::from_hex(&st.hex) {
-                st.brush = c;
-            }
+            && let Some(c) = Rgb::from_hex(&st.hex)
+        {
+            st.brush = c;
+        }
         ui.add_space(6.0);
-        for (r, g, b) in [(255, 59, 48), (255, 120, 20), (255, 176, 32), (255, 230, 60), (68, 214, 44), (0, 212, 170), (0, 184, 252), (40, 100, 255), (139, 92, 246), (232, 93, 208), (255, 255, 255)] {
+        for (r, g, b) in [
+            (255, 59, 48),
+            (255, 120, 20),
+            (255, 176, 32),
+            (255, 230, 60),
+            (68, 214, 44),
+            (0, 212, 170),
+            (0, 184, 252),
+            (40, 100, 255),
+            (139, 92, 246),
+            (232, 93, 208),
+            (255, 255, 255),
+        ] {
             let c = Rgb::new(r, g, b);
             if widgets::swatch(ui, c32(c), 22.0, c == st.brush).clicked() {
                 st.brush = c;
@@ -223,13 +310,38 @@ fn tools(
             *flush = true;
         }
         let eyedrop = st.tool == Tool::Eyedropper;
-        if widgets::button(ui, if eyedrop { Btn::Primary } else { Btn::Secondary }, Some(Icon::Eyedropper), "Pick colour").clicked() {
-            st.tool = if eyedrop { Tool::Paint } else { Tool::Eyedropper };
+        if widgets::button(
+            ui,
+            if eyedrop {
+                Btn::Primary
+            } else {
+                Btn::Secondary
+            },
+            Some(Icon::Eyedropper),
+            "Pick colour",
+        )
+        .clicked()
+        {
+            st.tool = if eyedrop {
+                Tool::Paint
+            } else {
+                Tool::Eyedropper
+            };
         }
         ui.add_space(10.0);
         let n = st.selection.len();
         ui.add_enabled_ui(n > 0, |ui| {
-            if widgets::secondary(ui, None, &if n == 0 { "Fill selection".to_string() } else { format!("Fill {n} selected") }).clicked() {
+            if widgets::secondary(
+                ui,
+                None,
+                &if n == 0 {
+                    "Fill selection".to_string()
+                } else {
+                    format!("Fill {n} selected")
+                },
+            )
+            .clicked()
+            {
                 painted.extend(st.selection.iter().map(|k| (*k, st.brush)));
                 *flush = true;
             }
@@ -239,7 +351,10 @@ fn tools(
         });
     });
     ui.add_space(2.0);
-    widgets::caption(ui, "Click or drag to paint · Shift + drag to select a rectangle · Shift + click toggles a key");
+    widgets::caption(
+        ui,
+        "Click or drag to paint · Shift + drag to select a rectangle · Shift + click toggles a key",
+    );
 }
 
 #[cfg(test)]
@@ -260,7 +375,10 @@ mod tests {
     #[test]
     fn rectangle_selection_picks_intersecting_keys() {
         let l = periph_core::keys::ansi_tkl();
-        let g = illustration::keyboard_geom(Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 300.0)), &l);
+        let g = illustration::keyboard_geom(
+            Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 300.0)),
+            &l,
+        );
         let esc = l.keys.iter().find(|k| k.id == 0x29).unwrap();
         let r = illustration::key_rect(&g, esc);
         let set = keys_in_rect(&g, &l, r.shrink(2.0));

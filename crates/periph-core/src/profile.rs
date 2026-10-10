@@ -148,7 +148,7 @@ impl Default for Preferences {
             theme: Theme::Dark,
             accent: "#00d4aa".into(),
             auto_switch: false,
-            demo_devices: true,
+            demo_devices: false,
         }
     }
 }

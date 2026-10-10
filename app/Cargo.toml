@@ -12,6 +12,12 @@ path = "src/main.rs"
 
 [dependencies]
 periph-core.workspace = true
+periph-hid.workspace = true
+periph-input.workspace = true
+periph-logitech.workspace = true
+periph-razer.workspace = true
+periph-corsair.workspace = true
+periph-steelseries.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 log.workspace = true

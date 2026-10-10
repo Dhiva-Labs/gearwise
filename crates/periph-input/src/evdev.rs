@@ -285,11 +285,16 @@ const MEDIA: &[(u16, u16)] = &[
 ];
 
 pub(crate) fn key(usage: u8) -> Option<u16> {
-    KEYS.binary_search_by_key(&usage, |&(u, _)| u).ok().map(|i| KEYS[i].1)
+    KEYS.binary_search_by_key(&usage, |&(u, _)| u)
+        .ok()
+        .map(|i| KEYS[i].1)
 }
 
 pub(crate) fn media(usage: u16) -> Option<u16> {
-    MEDIA.iter().find(|&&(u, _)| u == usage).map(|&(_, code)| code)
+    MEDIA
+        .iter()
+        .find(|&&(u, _)| u == usage)
+        .map(|&(_, code)| code)
 }
 
 /// evdev `BTN_*` for a physical button; `None` for the wheel pseudo-buttons.
@@ -308,7 +313,10 @@ pub(crate) fn button(button: MouseButton) -> Option<u16> {
 /// Every code the virtual device must declare with `UI_SET_KEYBIT`.
 pub(crate) fn all_codes() -> impl Iterator<Item = u16> {
     let buttons = MouseButton::ALL.into_iter().filter_map(button);
-    KEYS.iter().map(|&(_, c)| c).chain(MEDIA.iter().map(|&(_, c)| c)).chain(buttons)
+    KEYS.iter()
+        .map(|&(_, c)| c)
+        .chain(MEDIA.iter().map(|&(_, c)| c))
+        .chain(buttons)
 }
 
 #[cfg(test)]
@@ -323,7 +331,10 @@ mod tests {
     #[test]
     fn every_pickable_key_is_mapped() {
         for &(usage, name) in periph_core::keys::KEYS {
-            assert!(key(usage).is_some(), "{name} (0x{usage:02x}) has no evdev code");
+            assert!(
+                key(usage).is_some(),
+                "{name} (0x{usage:02x}) has no evdev code"
+            );
         }
     }
 
@@ -346,7 +357,10 @@ mod tests {
     #[test]
     fn every_pickable_media_usage_is_mapped() {
         for &(usage, name) in &periph_core::model::media::ALL {
-            assert!(media(usage).is_some(), "{name} (0x{usage:03x}) has no evdev code");
+            assert!(
+                media(usage).is_some(),
+                "{name} (0x{usage:03x}) has no evdev code"
+            );
         }
         assert_eq!(media(periph_core::model::media::PLAY_PAUSE), Some(164));
         assert_eq!(media(0xffff), None);

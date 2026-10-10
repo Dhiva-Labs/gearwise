@@ -86,7 +86,10 @@ mod tests {
     fn every_printable_ascii_char_has_a_known_key() {
         for c in (0x20u8..=0x7e).map(char::from).chain(['\n', '\t']) {
             let (usage, _) = ascii_key(c).unwrap_or_else(|| panic!("no key for {c:?}"));
-            assert!(KEYS.iter().any(|(u, _)| *u == usage), "{c:?} -> unknown usage {usage:#x}");
+            assert!(
+                KEYS.iter().any(|(u, _)| *u == usage),
+                "{c:?} -> unknown usage {usage:#x}"
+            );
         }
     }
 

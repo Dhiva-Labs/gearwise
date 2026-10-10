@@ -17,13 +17,23 @@ pub fn load(path: &Path) -> Loaded {
         Ok(lib) => Loaded { lib, notice: None },
         Err(e) => {
             log::warn!("cannot read {}: {e}", path.display());
-            let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
             let backup = path.with_extension(format!("json.corrupt-{stamp}"));
             let notice = match std::fs::rename(path, &backup) {
-                Ok(()) => format!("Your settings file could not be read. It was saved as {} and a fresh one was started.", backup.display()),
-                Err(_) => "Your settings file could not be read, so defaults are in use.".to_string(),
+                Ok(()) => format!(
+                    "Your settings file could not be read. It was saved as {} and a fresh one was started.",
+                    backup.display()
+                ),
+                Err(_) => {
+                    "Your settings file could not be read, so defaults are in use.".to_string()
+                }
             };
-            Loaded { lib: Library::starter(), notice: Some(notice) }
+            Loaded {
+                lib: Library::starter(),
+                notice: Some(notice),
+            }
         }
     }
 }

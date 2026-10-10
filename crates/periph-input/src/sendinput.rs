@@ -23,8 +23,13 @@ pub(crate) struct SendInputSink;
 fn send(inputs: &[INPUT]) -> Result<()> {
     // SAFETY: `inputs` is a valid slice of fully initialised `INPUT`s and the
     // size argument is `size_of::<INPUT>()`, as `SendInput` requires.
-    let sent =
-        unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), mem::size_of::<INPUT>() as i32) };
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            mem::size_of::<INPUT>() as i32,
+        )
+    };
     if sent as usize == inputs.len() {
         Ok(())
     } else {
@@ -41,7 +46,13 @@ fn keyboard(vk: u16, scan: u16, flags: u32) -> INPUT {
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
-            ki: KEYBDINPUT { wVk: vk, wScan: scan, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: scan,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
         },
     }
 }
@@ -116,7 +127,11 @@ impl InputSink for SendInputSink {
         if dy != 0 {
             inputs.push(mouse(amount(dy), MOUSEEVENTF_WHEEL));
         }
-        if inputs.is_empty() { Ok(()) } else { send(&inputs) }
+        if inputs.is_empty() {
+            Ok(())
+        } else {
+            send(&inputs)
+        }
     }
 
     fn media(&mut self, consumer_usage: u16) -> Result<()> {

@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 use egui::{Context, ViewportCommand};
 use periph_core::device::{Capabilities, DeviceDescriptor, DeviceState, Setting};
 use periph_core::model::{
-    ButtonAction, ButtonCaps, DeviceKind, DpiFunction, EffectKind, LightingEffect, LightingZoneCaps, Modifiers, MouseButton, Rgb, Vendor, WaveDirection, ZoneState,
-    media,
+    ButtonAction, ButtonCaps, DeviceKind, DpiFunction, EffectKind, LightingEffect,
+    LightingZoneCaps, Modifiers, MouseButton, Rgb, Vendor, WaveDirection, ZoneState, media,
 };
 use periph_core::profile::{Library, Macro, MacroMode, MacroStep, Profile, Theme};
 
@@ -43,30 +43,76 @@ struct Step {
 fn nothing(_: &mut App) {}
 
 fn steps() -> Vec<Step> {
-    let dev = |name, device, tab, prep| Step { name, route: Route::Device, device: Some(device), tab, theme: Theme::Dark, prep };
-    let page = |name, route| Step { name, route, device: None, tab: Tab::Info, theme: Theme::Dark, prep: nothing };
+    let dev = |name, device, tab, prep| Step {
+        name,
+        route: Route::Device,
+        device: Some(device),
+        tab,
+        theme: Theme::Dark,
+        prep,
+    };
+    let page = |name, route| Step {
+        name,
+        route,
+        device: None,
+        tab: Tab::Info,
+        theme: Theme::Dark,
+        prep: nothing,
+    };
     vec![
-        dev("01-assignments-mouse", LOGITECH, Tab::Assignments, |a| a.pages.assign.selected = Some(0x56)),
+        dev("01-assignments-mouse", LOGITECH, Tab::Assignments, |a| {
+            a.pages.assign.selected = Some(0x56)
+        }),
         dev("02-sensitivity", LOGITECH, Tab::Sensitivity, nothing),
-        dev("03-lighting-mouse", LOGITECH, Tab::Lighting, |a| a.pages.light.mode = LightMode::Effects),
-        dev("04-lighting-keyboard", RAZER, Tab::Lighting, |a| a.pages.light.mode = LightMode::Effects),
-        dev("05-lighting-per-key", RAZER, Tab::Lighting, |a| a.pages.light.mode = LightMode::PerKey),
-        dev("06-assignments-keyboard", RAZER, Tab::Assignments, |a| a.pages.assign.selected = Some(0x101)),
+        dev("03-lighting-mouse", LOGITECH, Tab::Lighting, |a| {
+            a.pages.light.mode = LightMode::Effects
+        }),
+        dev("04-lighting-keyboard", RAZER, Tab::Lighting, |a| {
+            a.pages.light.mode = LightMode::Effects
+        }),
+        dev("05-lighting-per-key", RAZER, Tab::Lighting, |a| {
+            a.pages.light.mode = LightMode::PerKey
+        }),
+        dev("06-assignments-keyboard", RAZER, Tab::Assignments, |a| {
+            a.pages.assign.selected = Some(0x101)
+        }),
         dev("07-performance", CORSAIR, Tab::Performance, nothing),
         page("08-profiles", Route::Profiles),
         page("09-macros", Route::Macros),
         page("10-settings", Route::Settings),
-        Step { theme: Theme::Light, ..dev("11-light-assignments", LOGITECH, Tab::Assignments, |a| a.pages.assign.selected = Some(0x5b)) },
-        Step { theme: Theme::Light, ..dev("12-light-lighting", LOGITECH, Tab::Lighting, |a| a.pages.light.zone = 1) },
-        dev("13-g502-hero-callouts", HERO, Tab::Assignments, |a| a.pages.assign.selected = Some(5)),
-        dev("14-superlight-callouts", SUPERLIGHT, Tab::Assignments, |a| a.pages.assign.selected = Some(3)),
-        dev("15-naga-button-grid", NAGA, Tab::Assignments, |a| a.pages.assign.selected = Some(8)),
+        Step {
+            theme: Theme::Light,
+            ..dev("11-light-assignments", LOGITECH, Tab::Assignments, |a| {
+                a.pages.assign.selected = Some(0x5b)
+            })
+        },
+        Step {
+            theme: Theme::Light,
+            ..dev("12-light-lighting", LOGITECH, Tab::Lighting, |a| {
+                a.pages.light.zone = 1
+            })
+        },
+        dev("13-g502-hero-callouts", HERO, Tab::Assignments, |a| {
+            a.pages.assign.selected = Some(5)
+        }),
+        dev(
+            "14-superlight-callouts",
+            SUPERLIGHT,
+            Tab::Assignments,
+            |a| a.pages.assign.selected = Some(3),
+        ),
+        dev("15-naga-button-grid", NAGA, Tab::Assignments, |a| {
+            a.pages.assign.selected = Some(8)
+        }),
         dev("16-deathadder-lighting", DEATHADDER, Tab::Lighting, nothing),
         dev("17-headset-lighting", HEADSET, Tab::Lighting, nothing),
         dev("18-info-permission-banner", LOGITECH, Tab::Info, |a| {
             a.show_sample_issue();
             a.toasts.push(ToastKind::Success, "Saved to G502 X Plus");
-            a.toasts.push(ToastKind::Error, "Report rate: not supported by this device");
+            a.toasts.push(
+                ToastKind::Error,
+                "Report rate: not supported by this device",
+            );
         }),
         page("19-empty-state", Route::Device).with_prep(|a| {
             a.clear_issues();
@@ -93,9 +139,15 @@ pub fn sample_library() -> Library {
 
     let mut reload = Macro::new("Reload and inspect");
     reload.steps = vec![
-        MacroStep::KeyTap { usage: 0x15, mods: Modifiers(0) },
+        MacroStep::KeyTap {
+            usage: 0x15,
+            mods: Modifiers(0),
+        },
         MacroStep::Delay(180),
-        MacroStep::KeyTap { usage: 0x09, mods: Modifiers(0) },
+        MacroStep::KeyTap {
+            usage: 0x09,
+            mods: Modifiers(0),
+        },
         MacroStep::Delay(60),
         MacroStep::MouseDown(MouseButton::Left),
         MacroStep::Delay(40),
@@ -103,9 +155,21 @@ pub fn sample_library() -> Library {
     ];
     let mut rapid = Macro::new("Rapid click");
     rapid.mode = MacroMode::WhileHeld;
-    rapid.steps = vec![MacroStep::MouseDown(MouseButton::Left), MacroStep::Delay(25), MacroStep::MouseUp(MouseButton::Left), MacroStep::Delay(25)];
+    rapid.steps = vec![
+        MacroStep::MouseDown(MouseButton::Left),
+        MacroStep::Delay(25),
+        MacroStep::MouseUp(MouseButton::Left),
+        MacroStep::Delay(25),
+    ];
     let mut sig = Macro::new("Email signature");
-    sig.steps = vec![MacroStep::Text("Best regards,".into()), MacroStep::KeyTap { usage: 0x28, mods: Modifiers(0) }, MacroStep::Text("Alex".into())];
+    sig.steps = vec![
+        MacroStep::Text("Best regards,".into()),
+        MacroStep::KeyTap {
+            usage: 0x28,
+            mods: Modifiers(0),
+        },
+        MacroStep::Text("Alex".into()),
+    ];
     lib.macros.extend([reload, rapid, sig]);
     lib
 }
@@ -125,7 +189,15 @@ impl Capture {
         if let Err(e) = std::fs::create_dir_all(&dir) {
             eprintln!("cannot create {}: {e}", dir.display());
         }
-        Self { dir, step: 0, frames: 0, entered: Instant::now(), requested: false, seeded: false, prepped: false }
+        Self {
+            dir,
+            step: 0,
+            frames: 0,
+            entered: Instant::now(),
+            requested: false,
+            seeded: false,
+            prepped: false,
+        }
     }
 }
 
@@ -160,7 +232,9 @@ impl App {
 
     /// Advance the screenshot run; called every frame from `logic`.
     pub(crate) fn drive_capture(&mut self, ctx: &Context) {
-        let Some(mut cap) = self.capture.take() else { return };
+        let Some(mut cap) = self.capture.take() else {
+            return;
+        };
         ctx.request_repaint();
         let all = steps();
         if cap.step >= all.len() {
@@ -187,7 +261,9 @@ impl App {
         });
         let step = &all[cap.step];
         if let Some(image) = shot {
-            let factor = (image.size[0] as f32 / ctx.content_rect().width()).round().max(1.0) as usize;
+            let factor = (image.size[0] as f32 / ctx.content_rect().width())
+                .round()
+                .max(1.0) as usize;
             let (w, h, rgb) = to_rgb(&image, factor);
             let path = cap.dir.join(format!("{}.png", step.name));
             match std::fs::write(&path, png::encode_rgb(w, h, &rgb)) {
@@ -208,7 +284,8 @@ impl App {
                 cap.prepped = true;
                 (step.prep)(self);
             }
-            if !cap.requested && cap.frames >= SETTLE_FRAMES && cap.entered.elapsed() >= SETTLE_TIME {
+            if !cap.requested && cap.frames >= SETTLE_FRAMES && cap.entered.elapsed() >= SETTLE_TIME
+            {
                 ctx.send_viewport_cmd(ViewportCommand::Screenshot(Default::default()));
                 cap.requested = true;
             }
@@ -217,14 +294,21 @@ impl App {
     }
 
     fn enter(&mut self, step: &Step) {
-        if step.device.is_some_and(|k| !self.devices.iter().any(|d| d.desc.model_key == k)) {
+        if step
+            .device
+            .is_some_and(|k| !self.devices.iter().any(|d| d.desc.model_key == k))
+        {
             for snap in extra_devices() {
                 self.on_event(crate::worker::Event::DeviceAdded(Box::new(snap)));
             }
         }
         self.route = step.route;
         if let Some(key) = step.device {
-            self.selected = self.devices.iter().find(|d| d.desc.model_key == key).map(|d| d.desc.id.clone());
+            self.selected = self
+                .devices
+                .iter()
+                .find(|d| d.desc.model_key == key)
+                .map(|d| d.desc.id.clone());
         }
         self.tab = step.tab;
         self.lib.prefs.theme = step.theme;
@@ -232,14 +316,16 @@ impl App {
 
     /// A fake "permission denied" scan result, to show the banner.
     fn show_sample_issue(&mut self) {
-        self.on_event(crate::worker::Event::ScanIssues(vec![periph_core::ScanIssue {
-            path: "/dev/hidraw3".into(),
-            vendor_id: 0x046d,
-            product_id: 0xc547,
-            product: Some("USB Receiver".into()),
-            permission_denied: true,
-            message: "permission denied opening /dev/hidraw3".into(),
-        }]));
+        self.on_event(crate::worker::Event::ScanIssues(vec![
+            periph_core::ScanIssue {
+                path: "/dev/hidraw3".into(),
+                vendor_id: 0x046d,
+                product_id: 0xc547,
+                product: Some("USB Receiver".into()),
+                permission_denied: true,
+                message: "permission denied opening /dev/hidraw3".into(),
+            },
+        ]));
     }
 
     fn clear_issues(&mut self) {
@@ -248,17 +334,33 @@ impl App {
 
     /// Give the demo mouse a few non-default buttons so the lists look lived in.
     fn seed(&mut self) {
-        let Some(dev) = self.devices.iter().find(|d| d.desc.model_key == LOGITECH).map(|d| d.desc.id.clone()) else { return };
+        let Some(dev) = self
+            .devices
+            .iter()
+            .find(|d| d.desc.model_key == LOGITECH)
+            .map(|d| d.desc.id.clone())
+        else {
+            return;
+        };
         let macro_id = self.lib.macros.first().map(|m| m.id.clone());
         let mut buttons = vec![
-            (0x56, ButtonAction::Key { usage: 0x06, mods: Modifiers(Modifiers::LCTRL) }),
+            (
+                0x56,
+                ButtonAction::Key {
+                    usage: 0x06,
+                    mods: Modifiers(Modifiers::LCTRL),
+                },
+            ),
             (0x5b, ButtonAction::Media(media::VOLUME_DOWN)),
             (0x5d, ButtonAction::Media(media::VOLUME_UP)),
         ];
         if let Some(id) = macro_id {
             buttons.push((0x53, ButtonAction::Macro(id)));
         }
-        let settings = buttons.into_iter().map(|(id, action)| Setting::Button { id, action }).collect();
+        let settings = buttons
+            .into_iter()
+            .map(|(id, action)| Setting::Button { id, action })
+            .collect();
         self.apply_many(&dev, settings);
     }
 }
@@ -266,7 +368,13 @@ impl App {
 // --- Simulated extras ---------------------------------------------------------------
 
 fn btn(id: u16, name: &str, default: ButtonAction, hotspot: Option<(f32, f32)>) -> ButtonCaps {
-    ButtonCaps { id, name: name.into(), remappable: true, default_action: default, hotspot }
+    ButtonCaps {
+        id,
+        name: name.into(),
+        remappable: true,
+        default_action: default,
+        hotspot,
+    }
 }
 
 fn mouse_btn(b: MouseButton) -> ButtonAction {
@@ -279,11 +387,32 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
     let mut base = demo.remove(0);
     let (d0, c0) = (base.descriptor().clone(), base.capabilities().clone());
     let s0 = base.read_state().unwrap_or_default();
-    let zone = |id: u8, name: &str| LightingZoneCaps { id, name: name.into(), effects: EffectKind::ALL[..5].to_vec(), brightness: true };
-    let lit = |color: Rgb| ZoneState { effect: LightingEffect::Static { color }, brightness: 90 };
-    let wave = ZoneState { effect: LightingEffect::Wave { period_ms: 3500, direction: WaveDirection::LeftToRight }, brightness: 80 };
+    let zone = |id: u8, name: &str| LightingZoneCaps {
+        id,
+        name: name.into(),
+        effects: EffectKind::ALL[..5].to_vec(),
+        brightness: true,
+    };
+    let lit = |color: Rgb| ZoneState {
+        effect: LightingEffect::Static { color },
+        brightness: 90,
+    };
+    let wave = ZoneState {
+        effect: LightingEffect::Wave {
+            period_ms: 3500,
+            direction: WaveDirection::LeftToRight,
+        },
+        brightness: 80,
+    };
 
-    let make = |name: &str, vendor: Vendor, kind: DeviceKind, pid: u16, buttons: Vec<ButtonCaps>, zones: Vec<LightingZoneCaps>, lighting: Vec<(u8, ZoneState)>, custom: Vec<(u16, ButtonAction)>| {
+    let make = |name: &str,
+                vendor: Vendor,
+                kind: DeviceKind,
+                pid: u16,
+                buttons: Vec<ButtonCaps>,
+                zones: Vec<LightingZoneCaps>,
+                lighting: Vec<(u8, ZoneState)>,
+                custom: Vec<(u16, ButtonAction)>| {
         let mut descriptor = DeviceDescriptor {
             id: format!("demo:{}:{pid:04x}", vendor.key()),
             model_key: DeviceDescriptor::model_key_for(vendor, pid),
@@ -293,29 +422,80 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
             ..d0.clone()
         };
         descriptor.product_id = pid;
-        let mut capabilities = Capabilities { buttons, lighting: zones, ..c0.clone() };
+        let mut capabilities = Capabilities {
+            buttons,
+            lighting: zones,
+            ..c0.clone()
+        };
         if kind == DeviceKind::Headset {
             capabilities.dpi = None;
             capabilities.report_rates.clear();
             capabilities.onboard_profiles = 0;
         }
-        let mut state = DeviceState { lighting: lighting.into_iter().collect(), ..s0.clone() };
+        let mut state = DeviceState {
+            lighting: lighting.into_iter().collect(),
+            ..s0.clone()
+        };
         state.buttons = custom.into_iter().collect();
-        DeviceSnapshot { descriptor, capabilities, state }
+        DeviceSnapshot {
+            descriptor,
+            capabilities,
+            state,
+        }
     };
 
     let hero_buttons = vec![
-        btn(0, "Left click", mouse_btn(MouseButton::Left), Some((0.30, 0.20))),
-        btn(1, "Right click", mouse_btn(MouseButton::Right), Some((0.70, 0.20))),
-        btn(2, "Middle click", mouse_btn(MouseButton::Middle), Some((0.50, 0.17))),
+        btn(
+            0,
+            "Left click",
+            mouse_btn(MouseButton::Left),
+            Some((0.30, 0.20)),
+        ),
+        btn(
+            1,
+            "Right click",
+            mouse_btn(MouseButton::Right),
+            Some((0.70, 0.20)),
+        ),
+        btn(
+            2,
+            "Middle click",
+            mouse_btn(MouseButton::Middle),
+            Some((0.50, 0.17)),
+        ),
         btn(3, "Back", mouse_btn(MouseButton::Back), Some((0.10, 0.50))),
-        btn(4, "Forward", mouse_btn(MouseButton::Forward), Some((0.11, 0.40))),
-        btn(5, "G6 · DPI shift (1200)", ButtonAction::Dpi(DpiFunction::Shift(1200)), None),
-        btn(6, "G7 · DPI down", ButtonAction::Dpi(DpiFunction::Down), None),
+        btn(
+            4,
+            "Forward",
+            mouse_btn(MouseButton::Forward),
+            Some((0.11, 0.40)),
+        ),
+        btn(
+            5,
+            "G6 · DPI shift (1200)",
+            ButtonAction::Dpi(DpiFunction::Shift(1200)),
+            None,
+        ),
+        btn(
+            6,
+            "G7 · DPI down",
+            ButtonAction::Dpi(DpiFunction::Down),
+            None,
+        ),
         btn(7, "G8 · DPI up", ButtonAction::Dpi(DpiFunction::Up), None),
         btn(8, "G9 · Profile cycle", ButtonAction::ProfileCycle, None),
-        btn(9, "G10 · Scroll right", mouse_btn(MouseButton::WheelRight), None),
-        btn(10, "G11 · Scroll left", mouse_btn(MouseButton::WheelLeft), None),
+        btn(
+            9,
+            "G10 · Scroll right",
+            mouse_btn(MouseButton::WheelRight),
+            None,
+        ),
+        btn(
+            10,
+            "G11 · Scroll left",
+            mouse_btn(MouseButton::WheelLeft),
+            None,
+        ),
     ];
     let slim_buttons = vec![
         btn(0, "Left click", mouse_btn(MouseButton::Left), None),
@@ -327,14 +507,108 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
     ];
     let mut naga_buttons = slim_buttons[..3].to_vec();
     naga_buttons.push(btn(3, "DPI up", ButtonAction::Dpi(DpiFunction::Up), None));
-    naga_buttons.push(btn(4, "DPI down", ButtonAction::Dpi(DpiFunction::Down), None));
-    naga_buttons.extend((1..=12u16).map(|n| btn(4 + n, &format!("Side button {n}"), ButtonAction::Key { usage: 0x1d + n as u8, mods: Modifiers(0) }, None)));
+    naga_buttons.push(btn(
+        4,
+        "DPI down",
+        ButtonAction::Dpi(DpiFunction::Down),
+        None,
+    ));
+    naga_buttons.extend((1..=12u16).map(|n| {
+        btn(
+            4 + n,
+            &format!("Side button {n}"),
+            ButtonAction::Key {
+                usage: 0x1d + n as u8,
+                mods: Modifiers(0),
+            },
+            None,
+        )
+    }));
 
     vec![
-        make("G502 HERO", Vendor::Logitech, DeviceKind::Mouse, 0xc08b, hero_buttons, vec![zone(0, "Primary"), zone(1, "Logo")], vec![(0, wave), (1, lit(Rgb::new(0, 184, 252)))], vec![(3, ButtonAction::Key { usage: 0x05, mods: Modifiers(Modifiers::LCTRL) }), (9, ButtonAction::Media(media::NEXT)), (10, ButtonAction::Media(media::PREVIOUS))]),
-        make("G Pro X Superlight", Vendor::Logitech, DeviceKind::Mouse, 0xc094, slim_buttons.clone(), vec![zone(0, "Logo")], vec![(0, lit(Rgb::new(255, 77, 94)))], vec![(3, ButtonAction::Key { usage: 0x06, mods: Modifiers(Modifiers::LCTRL) })]),
-        make("Naga Pro", Vendor::Razer, DeviceKind::Mouse, 0x0067, naga_buttons, vec![zone(0, "Logo"), zone(1, "Scroll wheel")], vec![(0, lit(Rgb::new(68, 214, 44))), (1, lit(Rgb::new(68, 214, 44)))], vec![(8, ButtonAction::Disabled), (10, ButtonAction::Media(media::MUTE))]),
-        make("DeathAdder V3", Vendor::Razer, DeviceKind::Mouse, 0x00b6, slim_buttons, vec![zone(0, "Logo"), zone(1, "Scroll wheel")], vec![(0, lit(Rgb::new(139, 92, 246))), (1, ZoneState { effect: LightingEffect::Breathing { color: Rgb::new(139, 92, 246), period_ms: 3000 }, brightness: 100 })], vec![]),
-        make("Arctis Nova", Vendor::Corsair, DeviceKind::Headset, 0x0a64, Vec::new(), vec![zone(0, "Logo")], vec![(0, lit(Rgb::new(255, 204, 0)))], vec![]),
+        make(
+            "G502 HERO",
+            Vendor::Logitech,
+            DeviceKind::Mouse,
+            0xc08b,
+            hero_buttons,
+            vec![zone(0, "Primary"), zone(1, "Logo")],
+            vec![(0, wave), (1, lit(Rgb::new(0, 184, 252)))],
+            vec![
+                (
+                    3,
+                    ButtonAction::Key {
+                        usage: 0x05,
+                        mods: Modifiers(Modifiers::LCTRL),
+                    },
+                ),
+                (9, ButtonAction::Media(media::NEXT)),
+                (10, ButtonAction::Media(media::PREVIOUS)),
+            ],
+        ),
+        make(
+            "G Pro X Superlight",
+            Vendor::Logitech,
+            DeviceKind::Mouse,
+            0xc094,
+            slim_buttons.clone(),
+            vec![zone(0, "Logo")],
+            vec![(0, lit(Rgb::new(255, 77, 94)))],
+            vec![(
+                3,
+                ButtonAction::Key {
+                    usage: 0x06,
+                    mods: Modifiers(Modifiers::LCTRL),
+                },
+            )],
+        ),
+        make(
+            "Naga Pro",
+            Vendor::Razer,
+            DeviceKind::Mouse,
+            0x0067,
+            naga_buttons,
+            vec![zone(0, "Logo"), zone(1, "Scroll wheel")],
+            vec![
+                (0, lit(Rgb::new(68, 214, 44))),
+                (1, lit(Rgb::new(68, 214, 44))),
+            ],
+            vec![
+                (8, ButtonAction::Disabled),
+                (10, ButtonAction::Media(media::MUTE)),
+            ],
+        ),
+        make(
+            "DeathAdder V3",
+            Vendor::Razer,
+            DeviceKind::Mouse,
+            0x00b6,
+            slim_buttons,
+            vec![zone(0, "Logo"), zone(1, "Scroll wheel")],
+            vec![
+                (0, lit(Rgb::new(139, 92, 246))),
+                (
+                    1,
+                    ZoneState {
+                        effect: LightingEffect::Breathing {
+                            color: Rgb::new(139, 92, 246),
+                            period_ms: 3000,
+                        },
+                        brightness: 100,
+                    },
+                ),
+            ],
+            vec![],
+        ),
+        make(
+            "Arctis Nova",
+            Vendor::Corsair,
+            DeviceKind::Headset,
+            0x0a64,
+            Vec::new(),
+            vec![zone(0, "Logo")],
+            vec![(0, lit(Rgb::new(255, 204, 0)))],
+            vec![],
+        ),
     ]
 }

@@ -23,7 +23,10 @@ pub fn bezier(p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, n: usize) -> Vec<Pos2> {
 
 /// Corner arcs of a rounded rectangle, clockwise from the top-left.
 pub fn rounded_poly(rect: Rect, radius: f32, seg: usize) -> Vec<Pos2> {
-    let r = radius.min(rect.width() / 2.0).min(rect.height() / 2.0).max(0.0);
+    let r = radius
+        .min(rect.width() / 2.0)
+        .min(rect.height() / 2.0)
+        .max(0.0);
     let corners = [
         (pos2(rect.min.x + r, rect.min.y + r), 180.0f32),
         (pos2(rect.max.x - r, rect.min.y + r), 270.0),
@@ -67,9 +70,15 @@ pub fn convex_hull(points: &[Pos2]) -> Vec<Pos2> {
     let mut hull: Vec<Pos2> = Vec::with_capacity(pts.len() * 2);
     for pass in 0..2 {
         let start = hull.len();
-        let iter: Box<dyn Iterator<Item = &Pos2>> = if pass == 0 { Box::new(pts.iter()) } else { Box::new(pts.iter().rev()) };
+        let iter: Box<dyn Iterator<Item = &Pos2>> = if pass == 0 {
+            Box::new(pts.iter())
+        } else {
+            Box::new(pts.iter().rev())
+        };
         for p in iter {
-            while hull.len() >= start + 2 && cross(hull[hull.len() - 2], hull[hull.len() - 1], *p) <= 0.0 {
+            while hull.len() >= start + 2
+                && cross(hull[hull.len() - 2], hull[hull.len() - 1], *p) <= 0.0
+            {
                 hull.pop();
             }
             hull.push(*p);
@@ -84,9 +93,17 @@ pub fn convex_hull(points: &[Pos2]) -> Vec<Pos2> {
 pub fn gradient_fan(points: &[Pos2], color_at: impl Fn(Pos2) -> Color32) -> Shape {
     let centre = centroid(points);
     let mut mesh = Mesh::default();
-    mesh.vertices.push(Vertex { pos: centre, uv: WHITE_UV, color: color_at(centre) });
+    mesh.vertices.push(Vertex {
+        pos: centre,
+        uv: WHITE_UV,
+        color: color_at(centre),
+    });
     for p in points {
-        mesh.vertices.push(Vertex { pos: *p, uv: WHITE_UV, color: color_at(*p) });
+        mesh.vertices.push(Vertex {
+            pos: *p,
+            uv: WHITE_UV,
+            color: color_at(*p),
+        });
     }
     let n = points.len() as u32;
     for i in 0..n {
@@ -97,15 +114,27 @@ pub fn gradient_fan(points: &[Pos2], color_at: impl Fn(Pos2) -> Color32) -> Shap
 
 /// Vertical two-colour gradient fan over `points`.
 pub fn vertical_fan(points: &[Pos2], top: Color32, bottom: Color32) -> Shape {
-    let (y0, y1) = points.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.y), b.max(p.y)));
-    gradient_fan(points, |p| crate::theme::mix(top, bottom, ((p.y - y0) / (y1 - y0).max(1.0)).clamp(0.0, 1.0)))
+    let (y0, y1) = points
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.y), b.max(p.y)));
+    gradient_fan(points, |p| {
+        crate::theme::mix(
+            top,
+            bottom,
+            ((p.y - y0) / (y1 - y0).max(1.0)).clamp(0.0, 1.0),
+        )
+    })
 }
 
 /// Soft round glow: translucent discs growing outwards around a solid core.
 pub fn glow(p: &Painter, center: Pos2, radius: f32, color: Color32) {
     for i in (1..=7).rev() {
         let k = i as f32 / 7.0;
-        p.circle_filled(center, radius * (1.0 + 2.0 * k), with_alpha(color, (20.0 * (1.0 - k) + 4.0) as u8));
+        p.circle_filled(
+            center,
+            radius * (1.0 + 2.0 * k),
+            with_alpha(color, (20.0 * (1.0 - k) + 4.0) as u8),
+        );
     }
     p.circle_filled(center, radius, color);
 }
@@ -113,7 +142,10 @@ pub fn glow(p: &Painter, center: Pos2, radius: f32, color: Color32) {
 /// Soft glow along a polyline: wide faint strokes under narrower brighter ones.
 pub fn glow_line(p: &Painter, pts: &[Pos2], width: f32, color: Color32) {
     for (k, a) in [(3.2, 14u8), (2.2, 28), (1.5, 54), (1.0, 120)] {
-        p.add(Shape::line(pts.to_vec(), PathStroke::new(width * k, with_alpha(color, a))));
+        p.add(Shape::line(
+            pts.to_vec(),
+            PathStroke::new(width * k, with_alpha(color, a)),
+        ));
     }
 }
 
@@ -130,11 +162,20 @@ mod tests {
 
     #[test]
     fn bezier_hits_its_end_points_and_stays_in_the_hull() {
-        let pts = bezier(pos2(0.0, 0.0), pos2(0.0, 10.0), pos2(10.0, 10.0), pos2(10.0, 0.0), 16);
+        let pts = bezier(
+            pos2(0.0, 0.0),
+            pos2(0.0, 10.0),
+            pos2(10.0, 10.0),
+            pos2(10.0, 0.0),
+            16,
+        );
         assert_eq!(pts.len(), 17);
         assert_eq!(pts[0], pos2(0.0, 0.0));
         assert!((pts[16] - pos2(10.0, 0.0)).length() < 1e-4);
-        assert!(pts.iter().all(|p| (0.0..=10.0).contains(&p.x) && (0.0..=10.0).contains(&p.y)));
+        assert!(
+            pts.iter()
+                .all(|p| (0.0..=10.0).contains(&p.x) && (0.0..=10.0).contains(&p.y))
+        );
     }
 
     #[test]
@@ -144,12 +185,23 @@ mod tests {
         assert_eq!(pts.len(), 20);
         assert!(pts.iter().all(|p| r.expand(0.01).contains(*p)));
         // A radius larger than half the short side is clamped, not inverted.
-        assert!(rounded_poly(r, 100.0, 4).iter().all(|p| r.expand(0.01).contains(*p)));
+        assert!(
+            rounded_poly(r, 100.0, 4)
+                .iter()
+                .all(|p| r.expand(0.01).contains(*p))
+        );
     }
 
     #[test]
     fn hull_drops_interior_points() {
-        let square = [pos2(0.0, 0.0), pos2(10.0, 0.0), pos2(10.0, 10.0), pos2(0.0, 10.0), pos2(5.0, 5.0), pos2(2.0, 8.0)];
+        let square = [
+            pos2(0.0, 0.0),
+            pos2(10.0, 0.0),
+            pos2(10.0, 10.0),
+            pos2(0.0, 10.0),
+            pos2(5.0, 5.0),
+            pos2(2.0, 8.0),
+        ];
         let hull = convex_hull(&square);
         assert_eq!(hull.len(), 4);
         assert!(!hull.contains(&pos2(5.0, 5.0)));
@@ -162,6 +214,10 @@ mod tests {
         let c = centroid(&pts);
         assert!((c - pos2(5.0, 5.0)).length() < 0.5);
         let upright = rot_rrect(pos2(0.0, 0.0), 10.0, 20.0, 0.0, 0.0);
-        assert!(upright.iter().all(|p| p.x.abs() <= 5.01 && p.y.abs() <= 10.01));
+        assert!(
+            upright
+                .iter()
+                .all(|p| p.x.abs() <= 5.01 && p.y.abs() <= 10.01)
+        );
     }
 }

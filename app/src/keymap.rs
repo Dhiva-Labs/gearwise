@@ -110,7 +110,9 @@ pub fn hid_usage(key: Key) -> Option<u8> {
 
 /// Modifier bit for a modifier usage (0xe0..=0xe7).
 pub fn modifier_bit(usage: u8) -> Option<u8> {
-    (0xe0..=0xe7).contains(&usage).then(|| 1u8 << (usage - 0xe0))
+    (0xe0..=0xe7)
+        .contains(&usage)
+        .then(|| 1u8 << (usage - 0xe0))
 }
 
 /// One physical key transition seen by the window.
@@ -128,14 +130,28 @@ pub fn take_key_events(ctx: &egui::Context) -> Vec<KeyEv> {
     let mut out = Vec::new();
     ctx.input_mut(|i| {
         i.events.retain(|e| match e {
-            egui::Event::Key { key, physical_key, pressed, repeat, .. } => {
+            egui::Event::Key {
+                key,
+                physical_key,
+                pressed,
+                repeat,
+                ..
+            } => {
                 if !*repeat
-                    && let Some(usage) = hid_usage(physical_key.unwrap_or(*key)).or_else(|| hid_usage(*key)) {
-                        out.push(KeyEv { usage, pressed: *pressed, at: now });
-                    }
+                    && let Some(usage) =
+                        hid_usage(physical_key.unwrap_or(*key)).or_else(|| hid_usage(*key))
+                {
+                    out.push(KeyEv {
+                        usage,
+                        pressed: *pressed,
+                        at: now,
+                    });
+                }
                 false
             }
-            egui::Event::Text(_) | egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_) => false,
+            egui::Event::Text(_) | egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_) => {
+                false
+            }
             _ => true,
         });
     });
@@ -176,7 +192,11 @@ mod tests {
     use super::*;
 
     fn ev(usage: u8, pressed: bool) -> KeyEv {
-        KeyEv { usage, pressed, at: Instant::now() }
+        KeyEv {
+            usage,
+            pressed,
+            at: Instant::now(),
+        }
     }
 
     #[test]
@@ -199,9 +219,13 @@ mod tests {
     fn every_mapped_key_has_a_name_in_the_key_table() {
         for key in Key::ALL {
             if let Some(u) = hid_usage(*key)
-                && u != 0x64 {
-                    assert!(periph_core::keys::name(u).is_some(), "{key:?} -> 0x{u:02x} has no name");
-                }
+                && u != 0x64
+            {
+                assert!(
+                    periph_core::keys::name(u).is_some(),
+                    "{key:?} -> 0x{u:02x} has no name"
+                );
+            }
         }
     }
 
@@ -210,10 +234,14 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         for key in Key::ALL {
             let letter_or_digit = format!("{key:?}");
-            if (letter_or_digit.len() == 1 && letter_or_digit.chars().all(|c| c.is_ascii_uppercase()))
+            if (letter_or_digit.len() == 1
+                && letter_or_digit.chars().all(|c| c.is_ascii_uppercase()))
                 || letter_or_digit.starts_with("Num")
             {
-                assert!(seen.insert(hid_usage(*key).unwrap()), "duplicate usage for {key:?}");
+                assert!(
+                    seen.insert(hid_usage(*key).unwrap()),
+                    "duplicate usage for {key:?}"
+                );
             }
         }
         assert_eq!(seen.len(), 36);

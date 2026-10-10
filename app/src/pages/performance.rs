@@ -9,19 +9,32 @@ use crate::widgets::{self, Seg};
 
 /// "8K" style label for rates of 1000 Hz and up, plain number below.
 pub fn rate_label(hz: u16) -> String {
-    if hz >= 1000 && hz.is_multiple_of(1000) { format!("{}K", hz / 1000) } else { hz.to_string() }
+    if hz >= 1000 && hz.is_multiple_of(1000) {
+        format!("{}K", hz / 1000)
+    } else {
+        hz.to_string()
+    }
 }
 
 pub fn show(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
     let pal = palette(ui.ctx());
     let id = &dev.desc.id;
-    let send = |out: &mut Vec<Action>, s: Setting| out.push(Action::Apply { dev: id.clone(), setting: s, debounce: false });
+    let send = |out: &mut Vec<Action>, s: Setting| {
+        out.push(Action::Apply {
+            dev: id.clone(),
+            setting: s,
+            debounce: false,
+        })
+    };
 
     if !dev.caps.report_rates.is_empty() {
         widgets::card(ui, |ui| {
             ui.set_width(ui.available_width());
             widgets::subtitle(ui, "Report rate");
-            widgets::muted(ui, "How often the device reports to the computer. Higher is smoother and uses more CPU.");
+            widgets::muted(
+                ui,
+                "How often the device reports to the computer. Higher is smoother and uses more CPU.",
+            );
             ui.add_space(8.0);
             let current = dev.state.report_rate;
             ui.horizontal_wrapped(|ui| {
@@ -33,14 +46,39 @@ pub fn show(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
                     let (fill, stroke) = if selected {
                         (pal.accent_soft, Stroke::new(1.5, pal.accent))
                     } else if hot {
-                        (mix(pal.raised, pal.accent, 0.1), Stroke::new(1.0, mix(pal.border, pal.accent, 0.5)))
+                        (
+                            mix(pal.raised, pal.accent, 0.1),
+                            Stroke::new(1.0, mix(pal.border, pal.accent, 0.5)),
+                        )
                     } else {
                         (pal.raised, Stroke::new(1.0, pal.border))
                     };
-                    ui.painter().rect(rect, CornerRadius::same(10), fill, stroke, StrokeKind::Inside);
-                    let ink = if selected { pal.accent_text() } else { pal.text };
-                    ui.painter().text(rect.center() - vec2(0.0, 7.0), egui::Align2::CENTER_CENTER, rate_label(hz), FontId::proportional(22.0), ink);
-                    ui.painter().text(rect.center() + vec2(0.0, 17.0), egui::Align2::CENTER_CENTER, "Hz", FontId::proportional(11.5), pal.muted);
+                    ui.painter().rect(
+                        rect,
+                        CornerRadius::same(10),
+                        fill,
+                        stroke,
+                        StrokeKind::Inside,
+                    );
+                    let ink = if selected {
+                        pal.accent_text()
+                    } else {
+                        pal.text
+                    };
+                    ui.painter().text(
+                        rect.center() - vec2(0.0, 7.0),
+                        egui::Align2::CENTER_CENTER,
+                        rate_label(hz),
+                        FontId::proportional(22.0),
+                        ink,
+                    );
+                    ui.painter().text(
+                        rect.center() + vec2(0.0, 17.0),
+                        egui::Align2::CENTER_CENTER,
+                        "Hz",
+                        FontId::proportional(11.5),
+                        pal.muted,
+                    );
                     if resp.on_hover_text(format!("{hz} Hz")).clicked() && !selected {
                         send(out, Setting::ReportRate(hz));
                     }
@@ -55,10 +93,19 @@ pub fn show(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
         widgets::card(ui, |ui| {
             ui.set_width(ui.available_width());
             widgets::subtitle(ui, "Lift-off distance");
-            widgets::muted(ui, "How far the mouse can rise before the sensor stops tracking.");
+            widgets::muted(
+                ui,
+                "How far the mouse can rise before the sensor stops tracking.",
+            );
             ui.add_space(8.0);
             let current = dev.state.lift_off.unwrap_or(0);
-            let items: Vec<Seg<u8>> = dev.caps.lift_off.iter().enumerate().map(|(i, l)| Seg::new(i as u8, l.clone())).collect();
+            let items: Vec<Seg<u8>> = dev
+                .caps
+                .lift_off
+                .iter()
+                .enumerate()
+                .map(|(i, l)| Seg::new(i as u8, l.clone()))
+                .collect();
             if let Some(v) = widgets::segmented(ui, current, &items) {
                 send(out, Setting::LiftOff(v));
             }
@@ -71,11 +118,16 @@ pub fn show(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
             ui.set_width(ui.available_width());
             if dev.caps.angle_snapping {
                 let mut on = dev.state.angle_snapping.unwrap_or(false);
-                widgets::setting_row(ui, "Angle snapping", "Straightens small deviations in diagonal movement. Helps drawing, hurts aim.", |ui| {
-                    if widgets::toggle(ui, &mut on) {
-                        send(out, Setting::AngleSnapping(on));
-                    }
-                });
+                widgets::setting_row(
+                    ui,
+                    "Angle snapping",
+                    "Straightens small deviations in diagonal movement. Helps drawing, hurts aim.",
+                    |ui| {
+                        if widgets::toggle(ui, &mut on) {
+                            send(out, Setting::AngleSnapping(on));
+                        }
+                    },
+                );
             }
             if dev.caps.angle_snapping && dev.caps.game_mode {
                 ui.add_space(6.0);
@@ -84,11 +136,16 @@ pub fn show(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
             }
             if dev.caps.game_mode {
                 let mut on = dev.state.game_mode.unwrap_or(false);
-                widgets::setting_row(ui, "Game mode", "Disables the Super key and shortcuts like Alt+Tab while you play.", |ui| {
-                    if widgets::toggle(ui, &mut on) {
-                        send(out, Setting::GameMode(on));
-                    }
-                });
+                widgets::setting_row(
+                    ui,
+                    "Game mode",
+                    "Disables the Super key and shortcuts like Alt+Tab while you play.",
+                    |ui| {
+                        if widgets::toggle(ui, &mut on) {
+                            send(out, Setting::GameMode(on));
+                        }
+                    },
+                );
             }
         });
     }

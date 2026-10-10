@@ -23,9 +23,17 @@ impl X11 {
     fn connect() -> Result<Self, Box<dyn std::error::Error>> {
         let (conn, screen) = RustConnection::connect(None)?;
         let root = conn.setup().roots[screen].root;
-        let active_window = conn.intern_atom(false, b"_NET_ACTIVE_WINDOW")?.reply()?.atom;
+        let active_window = conn
+            .intern_atom(false, b"_NET_ACTIVE_WINDOW")?
+            .reply()?
+            .atom;
         let wm_pid = conn.intern_atom(false, b"_NET_WM_PID")?.reply()?.atom;
-        Ok(Self { conn, root, active_window, wm_pid })
+        Ok(Self {
+            conn,
+            root,
+            active_window,
+            wm_pid,
+        })
     }
 
     /// First 32-bit value of a property, if the window has one.
@@ -35,7 +43,10 @@ impl X11 {
         property: Atom,
         kind: AtomEnum,
     ) -> Result<Option<u32>, ReplyError> {
-        let reply = self.conn.get_property(false, window, property, kind, 0, 1)?.reply()?;
+        let reply = self
+            .conn
+            .get_property(false, window, property, kind, 0, 1)?
+            .reply()?;
         Ok(reply.value32().and_then(|mut values| values.next()))
     }
 
@@ -106,7 +117,10 @@ mod tests {
 
     #[test]
     fn executable_name_is_lowercased() {
-        assert_eq!(app_name(Some("Blender"), || unreachable!()).as_deref(), Some("blender"));
+        assert_eq!(
+            app_name(Some("Blender"), || unreachable!()).as_deref(),
+            Some("blender")
+        );
     }
 
     #[test]
@@ -120,7 +134,10 @@ mod tests {
     #[test]
     fn wine_loaders_use_the_process_name() {
         let comm = || Some("Game.exe\n".to_string());
-        assert_eq!(app_name(Some("wine64-preloader"), comm).as_deref(), Some("game.exe"));
+        assert_eq!(
+            app_name(Some("wine64-preloader"), comm).as_deref(),
+            Some("game.exe")
+        );
         assert_eq!(
             app_name(Some("wine64-preloader"), || None).as_deref(),
             Some("wine64-preloader")
@@ -129,7 +146,10 @@ mod tests {
 
     #[test]
     fn falls_back_to_the_process_name_without_an_exe_link() {
-        assert_eq!(app_name(None, || Some("steam\n".into())).as_deref(), Some("steam"));
+        assert_eq!(
+            app_name(None, || Some("steam\n".into())).as_deref(),
+            Some("steam")
+        );
         assert_eq!(app_name(None, || None), None);
         assert_eq!(app_name(None, || Some("\n".into())), None);
     }

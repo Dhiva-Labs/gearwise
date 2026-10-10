@@ -121,7 +121,9 @@ pub fn create_sink() -> Result<Box<dyn InputSink + Send>> {
     }
     #[cfg(not(any(target_os = "linux", windows)))]
     {
-        Err(periph_core::Error::Unsupported("input injection on this platform"))
+        Err(periph_core::Error::Unsupported(
+            "input injection on this platform",
+        ))
     }
 }
 

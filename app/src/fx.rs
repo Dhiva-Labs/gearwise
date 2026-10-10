@@ -13,8 +13,13 @@ pub fn sample(effect: &LightingEffect, brightness: u8, t: f32, pos: f32, salt: u
             let phase = t * 1000.0 / f32::from(period_ms.max(1));
             scale(color, 0.5 - 0.5 * (phase * std::f32::consts::TAU).cos())
         }
-        LightingEffect::ColorCycle { period_ms } => Rgb::from_hue(360.0 * fract(t * 1000.0 / f32::from(period_ms.max(1)))),
-        LightingEffect::Wave { period_ms, direction } => {
+        LightingEffect::ColorCycle { period_ms } => {
+            Rgb::from_hue(360.0 * fract(t * 1000.0 / f32::from(period_ms.max(1))))
+        }
+        LightingEffect::Wave {
+            period_ms,
+            direction,
+        } => {
             let travel = fract(t * 1000.0 / f32::from(period_ms.max(1)));
             let hue = match direction {
                 WaveDirection::LeftToRight => pos - travel,
@@ -37,7 +42,11 @@ pub fn sample(effect: &LightingEffect, brightness: u8, t: f32, pos: f32, salt: u
 
 fn scale(c: Rgb, k: f32) -> Rgb {
     let k = k.clamp(0.0, 1.0);
-    Rgb::new((f32::from(c.r) * k) as u8, (f32::from(c.g) * k) as u8, (f32::from(c.b) * k) as u8)
+    Rgb::new(
+        (f32::from(c.r) * k) as u8,
+        (f32::from(c.g) * k) as u8,
+        (f32::from(c.b) * k) as u8,
+    )
 }
 
 fn fract(x: f32) -> f32 {
@@ -53,19 +62,28 @@ mod tests {
     #[test]
     fn off_is_black_and_static_is_its_colour() {
         assert_eq!(sample(&LightingEffect::Off, 100, 1.0, 0.5, 0), Rgb::BLACK);
-        assert_eq!(sample(&LightingEffect::Static { color: RED }, 100, 3.3, 0.1, 0), RED);
+        assert_eq!(
+            sample(&LightingEffect::Static { color: RED }, 100, 3.3, 0.1, 0),
+            RED
+        );
     }
 
     #[test]
     fn brightness_scales_the_result() {
         let c = sample(&LightingEffect::Static { color: RED }, 50, 0.0, 0.0, 0);
         assert_eq!(c, Rgb::new(127, 0, 0));
-        assert_eq!(sample(&LightingEffect::Static { color: RED }, 0, 0.0, 0.0, 0), Rgb::BLACK);
+        assert_eq!(
+            sample(&LightingEffect::Static { color: RED }, 0, 0.0, 0.0, 0),
+            Rgb::BLACK
+        );
     }
 
     #[test]
     fn breathing_goes_dark_and_bright_over_one_period() {
-        let e = LightingEffect::Breathing { color: RED, period_ms: 2000 };
+        let e = LightingEffect::Breathing {
+            color: RED,
+            period_ms: 2000,
+        };
         assert_eq!(sample(&e, 100, 0.0, 0.0, 0).r, 0);
         assert!(sample(&e, 100, 1.0, 0.0, 0).r >= 254);
         assert!(sample(&e, 100, 2.0, 0.0, 0).r <= 1);
@@ -81,8 +99,14 @@ mod tests {
 
     #[test]
     fn wave_moves_with_direction() {
-        let ltr = LightingEffect::Wave { period_ms: 4000, direction: WaveDirection::LeftToRight };
-        let rtl = LightingEffect::Wave { period_ms: 4000, direction: WaveDirection::RightToLeft };
+        let ltr = LightingEffect::Wave {
+            period_ms: 4000,
+            direction: WaveDirection::LeftToRight,
+        };
+        let rtl = LightingEffect::Wave {
+            period_ms: 4000,
+            direction: WaveDirection::RightToLeft,
+        };
         // At t = 0 hue follows position; a quarter period later the pattern has shifted.
         assert_eq!(sample(&ltr, 100, 0.0, 0.0, 0), RED);
         assert_eq!(sample(&ltr, 100, 1.0, 0.25, 0), RED);
@@ -91,8 +115,13 @@ mod tests {
 
     #[test]
     fn reactive_fades_after_a_press() {
-        let e = LightingEffect::Reactive { color: RED, duration_ms: 500 };
-        let samples: Vec<u8> = (0..240).map(|i| sample(&e, 100, i as f32 * 0.01, 0.0, 7).r).collect();
+        let e = LightingEffect::Reactive {
+            color: RED,
+            duration_ms: 500,
+        };
+        let samples: Vec<u8> = (0..240)
+            .map(|i| sample(&e, 100, i as f32 * 0.01, 0.0, 7).r)
+            .collect();
         assert!(samples.iter().any(|r| *r >= 250), "key lights up");
         assert!(samples.iter().any(|r| *r <= 40), "key rests dim");
     }

@@ -86,7 +86,9 @@ impl Palette {
                 c(0xf6, 0xf8, 0xfb),
             )
         };
-        let luma = 0.299 * f32::from(accent.r()) + 0.587 * f32::from(accent.g()) + 0.114 * f32::from(accent.b());
+        let luma = 0.299 * f32::from(accent.r())
+            + 0.587 * f32::from(accent.g())
+            + 0.114 * f32::from(accent.b());
         Self {
             dark,
             window,
@@ -98,10 +100,26 @@ impl Palette {
             muted,
             accent,
             accent_soft: with_alpha(accent, if dark { 38 } else { 44 }),
-            on_accent: if luma > 135.0 { c(0x0b, 0x10, 0x14) } else { Color32::WHITE },
-            danger: if dark { c(0xff, 0x5c, 0x6c) } else { c(0xd9, 0x2d, 0x42) },
-            success: if dark { c(0x3d, 0xdc, 0x84) } else { c(0x14, 0x9c, 0x5a) },
-            warning: if dark { c(0xff, 0xb0, 0x20) } else { c(0xc7, 0x7d, 0x00) },
+            on_accent: if luma > 135.0 {
+                c(0x0b, 0x10, 0x14)
+            } else {
+                Color32::WHITE
+            },
+            danger: if dark {
+                c(0xff, 0x5c, 0x6c)
+            } else {
+                c(0xd9, 0x2d, 0x42)
+            },
+            success: if dark {
+                c(0x3d, 0xdc, 0x84)
+            } else {
+                c(0x14, 0x9c, 0x5a)
+            },
+            warning: if dark {
+                c(0xff, 0xb0, 0x20)
+            } else {
+                c(0xc7, 0x7d, 0x00)
+            },
             input,
         }
     }
@@ -109,7 +127,11 @@ impl Palette {
     /// Text colour for accent-coloured labels: the accent itself on dark, a
     /// darker mix on light so it stays readable.
     pub fn accent_text(&self) -> Color32 {
-        if self.dark { self.accent } else { mix(self.accent, Color32::BLACK, 0.35) }
+        if self.dark {
+            self.accent
+        } else {
+            mix(self.accent, Color32::BLACK, 0.35)
+        }
     }
 }
 
@@ -133,7 +155,12 @@ pub fn with_alpha(c: Color32, a: u8) -> Color32 {
 /// Linear blend, alpha included (colours are premultiplied, so this is a proper cross-fade).
 pub fn mix(a: Color32, b: Color32, t: f32) -> Color32 {
     let l = |x: u8, y: u8| (f32::from(x) + (f32::from(y) - f32::from(x)) * t).round() as u8;
-    Color32::from_rgba_premultiplied(l(a.r(), b.r()), l(a.g(), b.g()), l(a.b(), b.b()), l(a.a(), b.a()))
+    Color32::from_rgba_premultiplied(
+        l(a.r(), b.r()),
+        l(a.g(), b.g()),
+        l(a.b(), b.b()),
+        l(a.a(), b.a()),
+    )
 }
 
 // --- Text styles -----------------------------------------------------------
@@ -156,21 +183,38 @@ pub fn big_number() -> TextStyle {
 
 /// The palette currently applied to `ctx`.
 pub fn palette(ctx: &Context) -> Palette {
-    ctx.data(|d| d.get_temp::<Palette>(Id::NULL)).unwrap_or_else(|| Palette::new(Theme::Dark, Color32::from_rgb(0, 0xd4, 0xaa)))
+    ctx.data(|d| d.get_temp::<Palette>(Id::NULL))
+        .unwrap_or_else(|| Palette::new(Theme::Dark, Color32::from_rgb(0, 0xd4, 0xaa)))
 }
 
 /// Install `pal` as the active look.
 pub fn apply(ctx: &Context, pal: &Palette) {
     ctx.data_mut(|d| d.insert_temp(Id::NULL, *pal));
-    ctx.set_theme(if pal.dark { egui::Theme::Dark } else { egui::Theme::Light });
+    ctx.set_theme(if pal.dark {
+        egui::Theme::Dark
+    } else {
+        egui::Theme::Light
+    });
 
     let mut style = (*ctx.global_style()).clone();
     style.text_styles = [
-        (TextStyle::Heading, FontId::new(22.0, FontFamily::Proportional)),
+        (
+            TextStyle::Heading,
+            FontId::new(22.0, FontFamily::Proportional),
+        ),
         (TextStyle::Body, FontId::new(14.0, FontFamily::Proportional)),
-        (TextStyle::Button, FontId::new(14.0, FontFamily::Proportional)),
-        (TextStyle::Small, FontId::new(12.0, FontFamily::Proportional)),
-        (TextStyle::Monospace, FontId::new(13.0, FontFamily::Monospace)),
+        (
+            TextStyle::Button,
+            FontId::new(14.0, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Small,
+            FontId::new(12.0, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Monospace,
+            FontId::new(13.0, FontFamily::Monospace),
+        ),
         (title(), FontId::new(28.0, FontFamily::Proportional)),
         (subtitle(), FontId::new(17.0, FontFamily::Proportional)),
         (section(), FontId::new(11.5, FontFamily::Proportional)),
@@ -202,7 +246,12 @@ pub fn apply(ctx: &Context, pal: &Palette) {
     v.window_stroke = Stroke::new(1.0, pal.border);
     v.window_corner_radius = CornerRadius::same(14);
     v.menu_corner_radius = CornerRadius::same(10);
-    v.window_shadow = egui::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(if pal.dark { 120 } else { 50 }) };
+    v.window_shadow = egui::Shadow {
+        offset: [0, 10],
+        blur: 28,
+        spread: 0,
+        color: Color32::from_black_alpha(if pal.dark { 120 } else { 50 }),
+    };
     v.popup_shadow = v.window_shadow;
     v.extreme_bg_color = pal.input;
     v.faint_bg_color = pal.raised;
@@ -287,9 +336,19 @@ mod tests {
     #[test]
     fn light_and_dark_palettes_differ_and_pick_readable_ink() {
         let teal = Color32::from_rgb(0, 0xd4, 0xaa);
-        let (d, l) = (Palette::new(Theme::Dark, teal), Palette::new(Theme::Light, teal));
+        let (d, l) = (
+            Palette::new(Theme::Dark, teal),
+            Palette::new(Theme::Light, teal),
+        );
         assert!(d.window.r() < 40 && l.window.r() > 200);
-        assert_eq!(d.on_accent, Color32::from_rgb(0x0b, 0x10, 0x14), "bright accents get dark ink");
-        assert_eq!(Palette::new(Theme::Dark, Color32::from_rgb(40, 20, 120)).on_accent, Color32::WHITE);
+        assert_eq!(
+            d.on_accent,
+            Color32::from_rgb(0x0b, 0x10, 0x14),
+            "bright accents get dark ink"
+        );
+        assert_eq!(
+            Palette::new(Theme::Dark, Color32::from_rgb(40, 20, 120)).on_accent,
+            Color32::WHITE
+        );
     }
 }

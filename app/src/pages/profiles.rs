@@ -2,7 +2,10 @@
 
 use std::path::PathBuf;
 
-use egui::{Align, CornerRadius, FontId, Layout, Modal, RichText, Sense, Stroke, StrokeKind, TextEdit, Ui, pos2, vec2};
+use egui::{
+    Align, CornerRadius, FontId, Layout, Modal, RichText, Sense, Stroke, StrokeKind, TextEdit, Ui,
+    pos2, vec2,
+};
 use periph_core::profile::{Library, Profile, new_id};
 
 use crate::icons::Icon;
@@ -23,9 +26,22 @@ pub struct ProfilesState {
 
 /// Default location offered for export/import.
 fn default_path(name: &str) -> String {
-    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map_or_else(|| PathBuf::from("."), PathBuf::from);
-    let file: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' { c } else { '_' }).collect();
-    home.join(format!("{file}.periph-profile.json")).to_string_lossy().into_owned()
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map_or_else(|| PathBuf::from("."), PathBuf::from);
+    let file: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    home.join(format!("{file}.periph-profile.json"))
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Clone of `src` with a new id and a name that does not clash with `existing`.
@@ -43,15 +59,32 @@ pub fn duplicate(src: &Profile, existing: &[Profile], suffix: &str) -> Profile {
     p
 }
 
-pub fn show(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[DeviceView], out: &mut Vec<Action>) {
-    if st.selected.as_deref().is_none_or(|id| lib.profile(id).is_none()) {
-        st.selected = lib.active_profile.clone().filter(|id| lib.profile(id).is_some()).or_else(|| lib.profiles.first().map(|p| p.id.clone()));
+pub fn show(
+    ui: &mut Ui,
+    st: &mut ProfilesState,
+    lib: &mut Library,
+    devices: &[DeviceView],
+    out: &mut Vec<Action>,
+) {
+    if st
+        .selected
+        .as_deref()
+        .is_none_or(|id| lib.profile(id).is_none())
+    {
+        st.selected = lib
+            .active_profile
+            .clone()
+            .filter(|id| lib.profile(id).is_some())
+            .or_else(|| lib.profiles.first().map(|p| p.id.clone()));
     }
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         widgets::title(ui, "Profiles");
     });
-    widgets::muted(ui, "A profile remembers button, DPI, lighting and performance settings for each device model.");
+    widgets::muted(
+        ui,
+        "A profile remembers button, DPI, lighting and performance settings for each device model.",
+    );
     ui.add_space(14.0);
 
     let total = ui.available_width();
@@ -84,26 +117,53 @@ fn list(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, out: &mut Vec<Ac
     for p in &lib.profiles {
         let selected = st.selected.as_deref() == Some(p.id.as_str());
         if st.renaming.as_deref() == Some(p.id.as_str()) {
-            let r = ui.add(TextEdit::singleline(&mut st.rename_buf).desired_width(ui.available_width()).font(FontId::proportional(14.0)));
+            let r = ui.add(
+                TextEdit::singleline(&mut st.rename_buf)
+                    .desired_width(ui.available_width())
+                    .font(FontId::proportional(14.0)),
+            );
             if !r.has_focus() && !r.gained_focus() {
                 r.request_focus();
             }
             if r.lost_focus() {
-                commit_rename = Some((p.id.clone(), ui.input(|i| i.key_pressed(egui::Key::Escape))));
+                commit_rename =
+                    Some((p.id.clone(), ui.input(|i| i.key_pressed(egui::Key::Escape))));
             }
             continue;
         }
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
         let painter = ui.painter();
         if selected {
-            painter.rect(rect, CornerRadius::same(9), pal.accent_soft, Stroke::new(1.0, pal.accent), StrokeKind::Inside);
+            painter.rect(
+                rect,
+                CornerRadius::same(9),
+                pal.accent_soft,
+                Stroke::new(1.0, pal.accent),
+                StrokeKind::Inside,
+            );
         } else if resp.hovered() {
             painter.rect_filled(rect, CornerRadius::same(9), pal.raised);
         }
-        let g = widgets::fit_text(painter, &p.name, FontId::proportional(14.0), pal.text, rect.width() - 90.0);
-        painter.galley(pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0), g, pal.text);
+        let g = widgets::fit_text(
+            painter,
+            &p.name,
+            FontId::proportional(14.0),
+            pal.text,
+            rect.width() - 90.0,
+        );
+        painter.galley(
+            pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0),
+            g,
+            pal.text,
+        );
         if active.as_deref() == Some(p.id.as_str()) {
-            painter.text(pos2(rect.max.x - 12.0, rect.center().y), egui::Align2::RIGHT_CENTER, "ACTIVE", FontId::proportional(10.5), pal.accent_text());
+            painter.text(
+                pos2(rect.max.x - 12.0, rect.center().y),
+                egui::Align2::RIGHT_CENTER,
+                "ACTIVE",
+                FontId::proportional(10.5),
+                pal.accent_text(),
+            );
         }
         if resp.clicked() {
             st.selected = Some(p.id.clone());
@@ -115,10 +175,12 @@ fn list(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, out: &mut Vec<Ac
     }
     if let Some((id, cancelled)) = commit_rename {
         let name = st.rename_buf.trim().to_string();
-        if !cancelled && !name.is_empty()
-            && let Some(p) = lib.profile_mut(&id) {
-                p.name = name;
-            }
+        if !cancelled
+            && !name.is_empty()
+            && let Some(p) = lib.profile_mut(&id)
+        {
+            p.name = name;
+        }
         st.renaming = None;
     }
     ui.add_space(8.0);
@@ -145,7 +207,14 @@ fn unique_name(existing: &[Profile], base: &str) -> String {
     name
 }
 
-fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[DeviceView], w: f32, out: &mut Vec<Action>) {
+fn detail(
+    ui: &mut Ui,
+    st: &mut ProfilesState,
+    lib: &mut Library,
+    devices: &[DeviceView],
+    w: f32,
+    out: &mut Vec<Action>,
+) {
     let Some(id) = st.selected.clone() else {
         widgets::card(ui, |ui| {
             ui.set_width(w - 34.0);
@@ -154,7 +223,9 @@ fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[Dev
         return;
     };
     let is_active = lib.active_profile.as_deref() == Some(id.as_str());
-    let Some(profile) = lib.profile(&id).cloned() else { return };
+    let Some(profile) = lib.profile(&id).cloned() else {
+        return;
+    };
 
     widgets::card(ui, |ui| {
         ui.set_width(w - 34.0);
@@ -180,10 +251,19 @@ fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[Dev
         });
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            if ui.add_enabled_ui(!is_active, |ui| widgets::primary(ui, Some(Icon::Check), "Set active")).inner.clicked() {
+            if ui
+                .add_enabled_ui(!is_active, |ui| {
+                    widgets::primary(ui, Some(Icon::Check), "Set active")
+                })
+                .inner
+                .clicked()
+            {
                 out.push(Action::ActivateProfile(id.clone()));
             }
-            if widgets::secondary(ui, Some(Icon::Play), "Apply now").on_hover_text("Send this profile's settings to connected devices").clicked() {
+            if widgets::secondary(ui, Some(Icon::Play), "Apply now")
+                .on_hover_text("Send this profile's settings to connected devices")
+                .clicked()
+            {
                 out.push(Action::ApplyProfile(id.clone()));
             }
         });
@@ -196,13 +276,21 @@ fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[Dev
         widgets::subtitle(ui, "Devices");
         ui.add_space(4.0);
         if profile.devices.is_empty() {
-            widgets::muted(ui, "Nothing saved yet. Open a device and press “Save to profile”.");
+            widgets::muted(
+                ui,
+                "Nothing saved yet. Open a device and press “Save to profile”.",
+            );
         }
         let mut remove = None;
         for (model, settings) in &profile.devices {
-            let connected: Vec<&DeviceView> = devices.iter().filter(|d| d.desc.model_key == *model).collect();
+            let connected: Vec<&DeviceView> = devices
+                .iter()
+                .filter(|d| d.desc.model_key == *model)
+                .collect();
             ui.horizontal(|ui| {
-                let name = connected.first().map_or_else(|| model.clone(), |d| d.display_name().to_string());
+                let name = connected
+                    .first()
+                    .map_or_else(|| model.clone(), |d| d.display_name().to_string());
                 ui.label(RichText::new(name).color(palette(ui.ctx()).text));
                 widgets::caption(ui, format!("{} settings", settings.len()));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -210,17 +298,24 @@ fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[Dev
                         remove = Some(model.clone());
                     }
                     for d in &connected {
-                        if widgets::secondary(ui, None, "Apply").on_hover_text(format!("Apply to {}", d.desc.name)).clicked() {
-                            out.push(Action::ApplyMany { dev: d.desc.id.clone(), settings: settings.clone() });
+                        if widgets::secondary(ui, None, "Apply")
+                            .on_hover_text(format!("Apply to {}", d.desc.name))
+                            .clicked()
+                        {
+                            out.push(Action::ApplyMany {
+                                dev: d.desc.id.clone(),
+                                settings: settings.clone(),
+                            });
                         }
                     }
                 });
             });
         }
         if let Some(model) = remove
-            && let Some(p) = lib.profile_mut(&id) {
-                p.devices.remove(&model);
-            }
+            && let Some(p) = lib.profile_mut(&id)
+        {
+            p.devices.remove(&model);
+        }
     });
     ui.add_space(14.0);
 
@@ -229,22 +324,51 @@ fn detail(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, devices: &[Dev
     transfer(ui, st, lib, &id, &profile, w, out);
 }
 
-fn linked_apps(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, id: &str, profile: &Profile, w: f32) {
+fn linked_apps(
+    ui: &mut Ui,
+    st: &mut ProfilesState,
+    lib: &mut Library,
+    id: &str,
+    profile: &Profile,
+    w: f32,
+) {
     let pal = palette(ui.ctx());
     widgets::card(ui, |ui| {
         ui.set_width(w - 34.0);
         widgets::subtitle(ui, "Linked applications");
-        widgets::muted(ui, "Switch to this profile when one of these programs is in the foreground.");
+        widgets::muted(
+            ui,
+            "Switch to this profile when one of these programs is in the foreground.",
+        );
         ui.add_space(6.0);
         let mut remove = None;
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             for (i, app) in profile.apps.iter().enumerate() {
-                let g = ui.painter().layout_no_wrap(app.clone(), FontId::proportional(13.0), pal.text);
-                let (rect, resp) = ui.allocate_exact_size(vec2(g.size().x + 40.0, 28.0), Sense::click());
-                ui.painter().rect(rect, CornerRadius::same(14), pal.raised, Stroke::new(1.0, pal.border), StrokeKind::Inside);
-                ui.painter().galley(rect.min + vec2(12.0, 14.0 - g.size().y / 2.0), g, pal.text);
-                crate::icons::paint(ui.painter(), crate::icons::square(pos2(rect.max.x - 16.0, rect.center().y), 12.0), Icon::Close, if resp.hovered() { pal.danger } else { pal.muted });
+                let g =
+                    ui.painter()
+                        .layout_no_wrap(app.clone(), FontId::proportional(13.0), pal.text);
+                let (rect, resp) =
+                    ui.allocate_exact_size(vec2(g.size().x + 40.0, 28.0), Sense::click());
+                ui.painter().rect(
+                    rect,
+                    CornerRadius::same(14),
+                    pal.raised,
+                    Stroke::new(1.0, pal.border),
+                    StrokeKind::Inside,
+                );
+                ui.painter()
+                    .galley(rect.min + vec2(12.0, 14.0 - g.size().y / 2.0), g, pal.text);
+                crate::icons::paint(
+                    ui.painter(),
+                    crate::icons::square(pos2(rect.max.x - 16.0, rect.center().y), 12.0),
+                    Icon::Close,
+                    if resp.hovered() {
+                        pal.danger
+                    } else {
+                        pal.muted
+                    },
+                );
                 if resp.on_hover_text("Remove").clicked() {
                     remove = Some(i);
                 }
@@ -255,36 +379,56 @@ fn linked_apps(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, id: &str,
         });
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            let r = ui.add(TextEdit::singleline(&mut st.app_input).hint_text("game.exe").desired_width(220.0));
-            let add = widgets::secondary(ui, Some(Icon::Plus), "Add").clicked() || (r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+            let r = ui.add(
+                TextEdit::singleline(&mut st.app_input)
+                    .hint_text("game.exe")
+                    .desired_width(220.0),
+            );
+            let add = widgets::secondary(ui, Some(Icon::Plus), "Add").clicked()
+                || (r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
             if add {
                 let name = st.app_input.trim().to_string();
                 if !name.is_empty() {
                     if let Some(p) = lib.profile_mut(id)
-                        && !p.apps.iter().any(|a| a.eq_ignore_ascii_case(&name)) {
-                            p.apps.push(name);
-                        }
+                        && !p.apps.iter().any(|a| a.eq_ignore_ascii_case(&name))
+                    {
+                        p.apps.push(name);
+                    }
                     st.app_input.clear();
                 }
             }
         });
         if let Some(i) = remove
-            && let Some(p) = lib.profile_mut(id) {
-                p.apps.remove(i);
-            }
+            && let Some(p) = lib.profile_mut(id)
+        {
+            p.apps.remove(i);
+        }
         ui.add_space(8.0);
         widgets::divider(ui);
         ui.add_space(8.0);
         let mut auto = lib.prefs.auto_switch;
-        widgets::setting_row(ui, "Switch profiles automatically", "Follows the focused program. Focus detection needs X11 or Windows; on Wayland switch by hand.", |ui| {
-            if widgets::toggle(ui, &mut auto) {
-                lib.prefs.auto_switch = auto;
-            }
-        });
+        widgets::setting_row(
+            ui,
+            "Switch profiles automatically",
+            "Follows the focused program. Focus detection needs X11 or Windows; on Wayland switch by hand.",
+            |ui| {
+                if widgets::toggle(ui, &mut auto) {
+                    lib.prefs.auto_switch = auto;
+                }
+            },
+        );
     });
 }
 
-fn transfer(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, id: &str, profile: &Profile, w: f32, out: &mut Vec<Action>) {
+fn transfer(
+    ui: &mut Ui,
+    st: &mut ProfilesState,
+    lib: &mut Library,
+    id: &str,
+    profile: &Profile,
+    w: f32,
+    out: &mut Vec<Action>,
+) {
     if st.path_for.as_deref() != Some(id) {
         st.path_for = Some(id.to_string());
         st.path = default_path(&profile.name);
@@ -292,27 +436,44 @@ fn transfer(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, id: &str, pr
     widgets::card(ui, |ui| {
         ui.set_width(w - 34.0);
         widgets::subtitle(ui, "Import and export");
-        widgets::muted(ui, "Share a profile as a JSON file. Type or paste the file path.");
+        widgets::muted(
+            ui,
+            "Share a profile as a JSON file. Type or paste the file path.",
+        );
         ui.add_space(6.0);
-        ui.add(TextEdit::singleline(&mut st.path).desired_width(ui.available_width()).font(FontId::monospace(13.0)));
+        ui.add(
+            TextEdit::singleline(&mut st.path)
+                .desired_width(ui.available_width())
+                .font(FontId::monospace(13.0)),
+        );
         ui.horizontal(|ui| {
             if widgets::secondary(ui, Some(Icon::Upload), "Export").clicked() {
-                let result = serde_json::to_string_pretty(profile).map_err(|e| e.to_string()).and_then(|s| std::fs::write(&st.path, s).map_err(|e| e.to_string()));
+                let result = serde_json::to_string_pretty(profile)
+                    .map_err(|e| e.to_string())
+                    .and_then(|s| std::fs::write(&st.path, s).map_err(|e| e.to_string()));
                 out.push(match result {
                     Ok(()) => Action::Toast(ToastKind::Success, format!("Exported to {}", st.path)),
                     Err(e) => Action::Toast(ToastKind::Error, format!("Export failed: {e}")),
                 });
             }
             if widgets::secondary(ui, Some(Icon::Download), "Import").clicked() {
-                let result = std::fs::read_to_string(&st.path).map_err(|e| e.to_string()).and_then(|s| serde_json::from_str::<Profile>(&s).map_err(|e| e.to_string()));
+                let result = std::fs::read_to_string(&st.path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|s| serde_json::from_str::<Profile>(&s).map_err(|e| e.to_string()));
                 match result {
                     Ok(p) => {
                         let p = duplicate(&p, &lib.profiles, "");
-                        out.push(Action::Toast(ToastKind::Success, format!("Imported “{}”", p.name)));
+                        out.push(Action::Toast(
+                            ToastKind::Success,
+                            format!("Imported “{}”", p.name),
+                        ));
                         st.selected = Some(p.id.clone());
                         lib.profiles.push(p);
                     }
-                    Err(e) => out.push(Action::Toast(ToastKind::Error, format!("Import failed: {e}"))),
+                    Err(e) => out.push(Action::Toast(
+                        ToastKind::Error,
+                        format!("Import failed: {e}"),
+                    )),
                 }
             }
         });
@@ -320,7 +481,9 @@ fn transfer(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library, id: &str, pr
 }
 
 fn delete_dialog(ui: &mut Ui, st: &mut ProfilesState, lib: &mut Library) {
-    let Some(id) = st.confirm_delete.clone() else { return };
+    let Some(id) = st.confirm_delete.clone() else {
+        return;
+    };
     let Some(name) = lib.profile(&id).map(|p| p.name.clone()) else {
         st.confirm_delete = None;
         return;

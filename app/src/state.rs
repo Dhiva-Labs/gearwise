@@ -19,12 +19,22 @@ pub struct DeviceView {
 
 impl DeviceView {
     pub fn new(s: DeviceSnapshot) -> Self {
-        Self { desc: s.descriptor, caps: s.capabilities, state: s.state, online: true, pending: 0, stale: false }
+        Self {
+            desc: s.descriptor,
+            caps: s.capabilities,
+            state: s.state,
+            online: true,
+            pending: 0,
+            stale: false,
+        }
     }
 
     /// Name without the " (demo)" suffix simulated devices carry (a Demo badge says so).
     pub fn display_name(&self) -> &str {
-        self.desc.name.strip_suffix(" (demo)").unwrap_or(&self.desc.name)
+        self.desc
+            .name
+            .strip_suffix(" (demo)")
+            .unwrap_or(&self.desc.name)
     }
 
     pub fn tabs(&self) -> Vec<Tab> {
@@ -85,8 +95,15 @@ pub enum ToastKind {
 
 /// What a page asks the app shell to do. Pages never touch devices or the worker.
 pub enum Action {
-    Apply { dev: String, setting: Setting, debounce: bool },
-    ApplyMany { dev: String, settings: Vec<Setting> },
+    Apply {
+        dev: String,
+        setting: Setting,
+        debounce: bool,
+    },
+    ApplyMany {
+        dev: String,
+        settings: Vec<Setting>,
+    },
     SaveOnboard(String),
     SaveToProfile(String),
     /// Make a profile the active one and apply it to connected devices.
@@ -150,12 +167,21 @@ mod tests {
     fn keys_distinguish_zones_and_buttons() {
         let z = |zone| Setting::Lighting {
             zone,
-            state: periph_core::model::ZoneState { effect: periph_core::model::LightingEffect::Off, brightness: 0 },
+            state: periph_core::model::ZoneState {
+                effect: periph_core::model::LightingEffect::Off,
+                brightness: 0,
+            },
         };
         assert_ne!(setting_key(&z(0)), setting_key(&z(1)));
-        let b = |id| Setting::Button { id, action: ButtonAction::Disabled };
+        let b = |id| Setting::Button {
+            id,
+            action: ButtonAction::Disabled,
+        };
         assert_ne!(setting_key(&b(1)), setting_key(&b(2)));
-        assert_eq!(setting_key(&Setting::ReportRate(500)), setting_key(&Setting::ReportRate(1000)));
+        assert_eq!(
+            setting_key(&Setting::ReportRate(500)),
+            setting_key(&Setting::ReportRate(1000))
+        );
     }
 
     #[test]
@@ -169,29 +195,50 @@ mod tests {
             }
             _ => panic!("expected per-key"),
         }
-        assert_eq!(merge_settings(Setting::ReportRate(125), Setting::ReportRate(1000)), Setting::ReportRate(1000));
+        assert_eq!(
+            merge_settings(Setting::ReportRate(125), Setting::ReportRate(1000)),
+            Setting::ReportRate(1000)
+        );
     }
 
     #[test]
     fn demo_suffix_is_dropped_from_display_names() {
         let mut d = periph_core::demo::devices().remove(0);
         let state = d.read_state().unwrap();
-        let v = DeviceView::new(DeviceSnapshot { descriptor: d.descriptor().clone(), capabilities: d.capabilities().clone(), state });
+        let v = DeviceView::new(DeviceSnapshot {
+            descriptor: d.descriptor().clone(),
+            capabilities: d.capabilities().clone(),
+            state,
+        });
         assert!(v.desc.name.ends_with("(demo)"));
         assert_eq!(v.display_name(), "G502 X Plus");
     }
 
     #[test]
     fn tabs_follow_capabilities() {
-        let snap = |caps: Capabilities| DeviceView::new(DeviceSnapshot {
-            descriptor: periph_core::demo::devices()[0].descriptor().clone(),
-            capabilities: caps,
-            state: DeviceState::default(),
-        });
+        let snap = |caps: Capabilities| {
+            DeviceView::new(DeviceSnapshot {
+                descriptor: periph_core::demo::devices()[0].descriptor().clone(),
+                capabilities: caps,
+                state: DeviceState::default(),
+            })
+        };
         assert_eq!(snap(Capabilities::default()).tabs(), vec![Tab::Info]);
         let demo = periph_core::demo::devices();
         let tabs = |i: usize| snap(demo[i].capabilities().clone()).tabs();
-        assert_eq!(tabs(0), vec![Tab::Assignments, Tab::Sensitivity, Tab::Lighting, Tab::Performance, Tab::Info]);
-        assert_eq!(tabs(1), vec![Tab::Assignments, Tab::Lighting, Tab::Performance, Tab::Info]);
+        assert_eq!(
+            tabs(0),
+            vec![
+                Tab::Assignments,
+                Tab::Sensitivity,
+                Tab::Lighting,
+                Tab::Performance,
+                Tab::Info
+            ]
+        );
+        assert_eq!(
+            tabs(1),
+            vec![Tab::Assignments, Tab::Lighting, Tab::Performance, Tab::Info]
+        );
     }
 }

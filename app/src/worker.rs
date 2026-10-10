@@ -18,10 +18,20 @@ const SCAN_INTERVAL: Duration = Duration::from_secs(2);
 pub enum Command {
     /// Scan for hot-plugged devices right now.
     Scan,
-    Apply { id: String, setting: Setting },
-    ApplySettings { id: String, settings: Vec<Setting> },
-    Refresh { id: String },
-    SaveOnboard { id: String },
+    Apply {
+        id: String,
+        setting: Setting,
+    },
+    ApplySettings {
+        id: String,
+        settings: Vec<Setting>,
+    },
+    Refresh {
+        id: String,
+    },
+    SaveOnboard {
+        id: String,
+    },
     SetDemo(bool),
     Shutdown,
 }
@@ -39,16 +49,36 @@ pub enum Event {
     DeviceAdded(Box<DeviceSnapshot>),
     DeviceRemoved(String),
     /// Authoritative re-read of a device.
-    State { id: String, state: DeviceState },
+    State {
+        id: String,
+        state: DeviceState,
+    },
     /// An `Apply` / `ApplySettings` finished. On failure `state` holds a re-read so the
     /// UI can roll back its optimistic update.
-    Applied { id: String, error: Option<String>, state: Option<DeviceState> },
-    Saved { id: String, error: Option<String> },
-    Battery { id: String, battery: Battery },
-    Online { id: String, online: bool },
+    Applied {
+        id: String,
+        error: Option<String>,
+        state: Option<DeviceState>,
+    },
+    Saved {
+        id: String,
+        error: Option<String>,
+    },
+    Battery {
+        id: String,
+        battery: Battery,
+    },
+    Online {
+        id: String,
+        online: bool,
+    },
     ScanIssues(Vec<ScanIssue>),
     /// A button diverted to software changed state.
-    Button { id: String, button: u16, down: bool },
+    Button {
+        id: String,
+        button: u16,
+        down: bool,
+    },
 }
 
 pub struct Worker {
@@ -58,14 +88,19 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn spawn(ctx: egui::Context, demo: bool) -> Self {
+    /// `hardware: false` runs without real devices (tests, screenshot tour).
+    pub fn spawn(ctx: egui::Context, demo: bool, hardware: bool) -> Self {
         let (tx, cmd_rx) = mpsc::channel();
         let (evt_tx, rx) = mpsc::channel();
         let join = std::thread::Builder::new()
             .name("device-worker".into())
-            .spawn(move || Runner::new(ctx, evt_tx, demo).run(cmd_rx))
+            .spawn(move || Runner::new(ctx, evt_tx, demo, hardware).run(cmd_rx))
             .expect("spawn device worker");
-        Self { tx, rx, join: Some(join) }
+        Self {
+            tx,
+            rx,
+            join: Some(join),
+        }
     }
 
     pub fn send(&self, cmd: Command) {
@@ -93,11 +128,16 @@ struct Runner {
 }
 
 impl Runner {
-    fn new(ctx: egui::Context, out: Sender<Event>, demo_wanted: bool) -> Self {
+    fn new(ctx: egui::Context, out: Sender<Event>, demo_wanted: bool, hardware: bool) -> Self {
+        let mgr = if hardware {
+            DeviceManager::new(drivers::backend(), drivers::drivers())
+        } else {
+            DeviceManager::new(drivers::offline(), Vec::new())
+        };
         Self {
             ctx,
             out,
-            mgr: DeviceManager::new(drivers::backend(), drivers::drivers()),
+            mgr,
             demo_on: false,
             demo_wanted,
             sent: false,
@@ -157,7 +197,9 @@ impl Runner {
                                 return Err(e);
                             }
                             log::warn!("{}: {}: {e}", d.descriptor().name, s.label());
-                            first_err.get_or_insert_with(|| Error::protocol(format!("{}: {e}", s.label())));
+                            first_err.get_or_insert_with(|| {
+                                Error::protocol(format!("{}: {e}", s.label()))
+                            });
                         }
                     }
                     first_err.map_or(Ok(()), Err)
@@ -173,7 +215,10 @@ impl Runner {
                 if matches!(result, Err(Error::Disconnected)) {
                     self.drop_device(&id);
                 } else {
-                    self.emit(Event::Saved { id, error: result.err().map(|e| e.to_string()) });
+                    self.emit(Event::Saved {
+                        id,
+                        error: result.err().map(|e| e.to_string()),
+                    });
                 }
             }
             Command::Shutdown => {}
@@ -195,7 +240,11 @@ impl Runner {
     fn finish_apply(&mut self, id: String, result: Result<(), Error>, always_read: bool) {
         if matches!(result, Err(Error::Disconnected)) {
             // The UI counts one reply per command, so answer before dropping.
-            self.emit(Event::Applied { id: id.clone(), error: Some(Error::Disconnected.to_string()), state: None });
+            self.emit(Event::Applied {
+                id: id.clone(),
+                error: Some(Error::Disconnected.to_string()),
+                state: None,
+            });
             self.drop_device(&id);
             return;
         }
@@ -228,13 +277,30 @@ impl Runner {
             let id = d.descriptor().id.clone();
             for ev in d.poll_events() {
                 match ev {
-                    DeviceEvent::ButtonDown(b) => events.push(Event::Button { id: id.clone(), button: b, down: true }),
-                    DeviceEvent::ButtonUp(b) => events.push(Event::Button { id: id.clone(), button: b, down: false }),
-                    DeviceEvent::BatteryChanged(battery) => events.push(Event::Battery { id: id.clone(), battery }),
+                    DeviceEvent::ButtonDown(b) => events.push(Event::Button {
+                        id: id.clone(),
+                        button: b,
+                        down: true,
+                    }),
+                    DeviceEvent::ButtonUp(b) => events.push(Event::Button {
+                        id: id.clone(),
+                        button: b,
+                        down: false,
+                    }),
+                    DeviceEvent::BatteryChanged(battery) => events.push(Event::Battery {
+                        id: id.clone(),
+                        battery,
+                    }),
                     DeviceEvent::StateChanged => refresh.push(id.clone()),
-                    DeviceEvent::Disconnected => events.push(Event::Online { id: id.clone(), online: false }),
+                    DeviceEvent::Disconnected => events.push(Event::Online {
+                        id: id.clone(),
+                        online: false,
+                    }),
                     DeviceEvent::Reconnected => {
-                        events.push(Event::Online { id: id.clone(), online: true });
+                        events.push(Event::Online {
+                            id: id.clone(),
+                            online: true,
+                        });
                         refresh.push(id.clone());
                     }
                 }

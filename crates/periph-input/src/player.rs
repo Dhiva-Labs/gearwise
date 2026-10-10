@@ -39,7 +39,10 @@ struct Control {
 
 impl Control {
     fn new() -> Self {
-        Self { signal: Mutex::new(Signal::Run), wake: Condvar::new() }
+        Self {
+            signal: Mutex::new(Signal::Run),
+            wake: Condvar::new(),
+        }
     }
 
     fn get(&self) -> Signal {
@@ -129,7 +132,11 @@ impl Playback {
     }
 
     fn delay(&self, d: Duration) -> Result<(), Halt> {
-        if self.ctl.sleep(d) { Err(Halt::Aborted) } else { Ok(()) }
+        if self.ctl.sleep(d) {
+            Err(Halt::Aborted)
+        } else {
+            Ok(())
+        }
     }
 
     fn key_down(&mut self, usage: u8) -> Result<(), Halt> {
@@ -161,7 +168,10 @@ impl Playback {
     /// Modifiers down, key down, brief hold, key up, modifiers up.
     fn tap(&mut self, usage: u8, mods: Modifiers) -> Result<(), Halt> {
         // Modifier bit n is HID usage 0xe0 + n.
-        let mods: Vec<u8> = (0..8).filter(|n| mods.0 & (1 << n) != 0).map(|n| 0xe0 + n).collect();
+        let mods: Vec<u8> = (0..8)
+            .filter(|n| mods.0 & (1 << n) != 0)
+            .map(|n| 0xe0 + n)
+            .collect();
         for &m in &mods {
             self.key_down(m)?;
         }
@@ -197,8 +207,16 @@ impl Playback {
 /// Worker thread body.
 fn play(sink: SharedSink, ctl: Arc<Control>, mac: Macro) {
     let looping = mac.mode != MacroMode::Once;
-    let gap = if mac.duration_ms() == 0 { MIN_LOOP_GAP } else { Duration::ZERO };
-    let mut playback = Playback { sink, ctl, held: Held::default() };
+    let gap = if mac.duration_ms() == 0 {
+        MIN_LOOP_GAP
+    } else {
+        Duration::ZERO
+    };
+    let mut playback = Playback {
+        sink,
+        ctl,
+        held: Held::default(),
+    };
     let outcome = playback.run(&mac.steps, looping, gap);
     playback.release_all();
     if let Err(Halt::Failed(e)) = outcome {
@@ -237,7 +255,10 @@ pub struct MacroPlayer {
 
 impl MacroPlayer {
     pub fn new(sink: SharedSink) -> Self {
-        Self { sink, active: Mutex::new(Vec::new()) }
+        Self {
+            sink,
+            active: Mutex::new(Vec::new()),
+        }
     }
 
     /// The trigger was pressed: start (or, for a running toggle, stop) `mac`.
@@ -245,7 +266,10 @@ impl MacroPlayer {
         let mut active = lock(&self.active);
         reap(&mut active);
 
-        if let Some(run) = active.iter_mut().find(|a| a.trigger == trigger && !a.ending) {
+        if let Some(run) = active
+            .iter_mut()
+            .find(|a| a.trigger == trigger && !a.ending)
+        {
             if run.mode == MacroMode::Toggle {
                 run.ending = true;
                 run.ctl.raise(Signal::Abort);
@@ -365,7 +389,11 @@ mod tests {
 
     /// A press/release pair with a delay in between: "a" held for `ms`.
     fn hold_a(ms: u32) -> Vec<MacroStep> {
-        vec![MacroStep::KeyDown(0x04), MacroStep::Delay(ms), MacroStep::KeyUp(0x04)]
+        vec![
+            MacroStep::KeyDown(0x04),
+            MacroStep::Delay(ms),
+            MacroStep::KeyUp(0x04),
+        ]
     }
 
     #[test]
@@ -485,7 +513,10 @@ mod tests {
     #[test]
     fn toggle_off_mid_delay_is_immediate_and_releases_held_keys() {
         let (p, rec) = setup();
-        let m = mac(MacroMode::Toggle, vec![MacroStep::KeyDown(0x04), MacroStep::Delay(60_000)]);
+        let m = mac(
+            MacroMode::Toggle,
+            vec![MacroStep::KeyDown(0x04), MacroStep::Delay(60_000)],
+        );
         p.press(&m, "t");
         wait_until("key down", || !rec.events().is_empty());
         let started = Instant::now();
@@ -510,7 +541,10 @@ mod tests {
         wait_until("steps to run", || rec.events().len() >= 4);
         let started = Instant::now();
         p.stop_all();
-        assert!(started.elapsed() < Duration::from_secs(2), "stop_all waited out the delay");
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "stop_all waited out the delay"
+        );
         assert!(!p.is_running("t"));
         assert_eq!(
             rec.events(),
@@ -540,7 +574,10 @@ mod tests {
     fn dropping_the_player_stops_playback() {
         let (p, rec) = setup();
         p.press(
-            &mac(MacroMode::Toggle, vec![MacroStep::KeyDown(0x04), MacroStep::Delay(60_000)]),
+            &mac(
+                MacroMode::Toggle,
+                vec![MacroStep::KeyDown(0x04), MacroStep::Delay(60_000)],
+            ),
             "t",
         );
         wait_until("key down", || !rec.events().is_empty());
@@ -552,8 +589,11 @@ mod tests {
     fn sink_error_ends_the_macro_and_releases_held_keys() {
         let rec = Recorder::failing_on(0x05);
         let p = player_for(rec.clone());
-        let steps =
-            vec![MacroStep::KeyDown(0x04), MacroStep::KeyDown(0x05), MacroStep::KeyUp(0x04)];
+        let steps = vec![
+            MacroStep::KeyDown(0x04),
+            MacroStep::KeyDown(0x05),
+            MacroStep::KeyUp(0x04),
+        ];
         p.press(&mac(MacroMode::Once, steps), "t");
         wait_idle(&p, "t");
         // The failed key is released too, in case the send half-succeeded.

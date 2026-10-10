@@ -184,7 +184,11 @@ impl InputSink for UinputSink {
 }
 
 fn cvt(ret: libc::c_int) -> Result<()> {
-    if ret < 0 { Err(io::Error::last_os_error().into()) } else { Ok(()) }
+    if ret < 0 {
+        Err(io::Error::last_os_error().into())
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

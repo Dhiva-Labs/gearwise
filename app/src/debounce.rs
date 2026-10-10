@@ -12,7 +12,10 @@ pub struct Debouncer<K, V> {
 
 impl<K: Eq + Hash + Clone, V> Debouncer<K, V> {
     pub fn new(delay: Duration) -> Self {
-        Self { delay, items: HashMap::new() }
+        Self {
+            delay,
+            items: HashMap::new(),
+        }
     }
 
     /// Queue `value` under `key`, restarting its timer. An already queued
@@ -38,14 +41,19 @@ impl<K: Eq + Hash + Clone, V> Debouncer<K, V> {
             .filter(|(_, (_, at))| now.saturating_duration_since(*at) >= self.delay)
             .map(|(k, _)| k.clone())
             .collect();
-        due.into_iter().filter_map(|k| self.items.remove(&k).map(|(v, _)| (k, v))).collect()
+        due.into_iter()
+            .filter_map(|k| self.items.remove(&k).map(|(v, _)| (k, v)))
+            .collect()
     }
 
     /// Time until the earliest entry is due, if anything is queued.
     pub fn next_due(&self, now: Instant) -> Option<Duration> {
         self.items
             .values()
-            .map(|(_, at)| self.delay.saturating_sub(now.saturating_duration_since(*at)))
+            .map(|(_, at)| {
+                self.delay
+                    .saturating_sub(now.saturating_duration_since(*at))
+            })
             .min()
     }
 

@@ -1718,6 +1718,12 @@ dependencies = [
  "log",
  "miniz_oxide 0.8.9",
  "periph-core",
+ "periph-corsair",
+ "periph-hid",
+ "periph-input",
+ "periph-logitech",
+ "periph-razer",
+ "periph-steelseries",
  "serde",
  "serde_json",
 ]

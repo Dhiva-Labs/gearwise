@@ -3,10 +3,13 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use egui::{Align, Color32, Context, CornerRadius, Frame, Layout, Margin, Panel, RichText, ScrollArea, Stroke, Ui};
+use egui::{
+    Align, Color32, Context, CornerRadius, Frame, Layout, Margin, Panel, RichText, ScrollArea,
+    Stroke, Ui,
+};
 use periph_core::ScanIssue;
 use periph_core::device::Setting;
-use periph_core::model::ButtonAction;
+use periph_core::model::{ButtonAction, DpiFunction};
 use periph_core::profile::{Library, Theme, default_library_path, settings_from_state};
 
 use crate::debounce::Debouncer;
@@ -17,7 +20,9 @@ use crate::pages::{self, PageStates};
 use crate::persist;
 use crate::screenshot::{self, Capture};
 use crate::sidebar::{self, Nav};
-use crate::state::{Action, DeviceView, Route, SettingKey, Tab, ToastKind, merge_settings, setting_key};
+use crate::state::{
+    Action, DeviceView, Route, SettingKey, Tab, ToastKind, merge_settings, setting_key,
+};
 use crate::theme::{self, Palette, palette, with_alpha};
 use crate::toasts::Toasts;
 use crate::widgets;
@@ -31,6 +36,8 @@ pub struct Options {
     pub screenshot_dir: Option<PathBuf>,
     /// Library file; `None` means the default location.
     pub library_path: Option<PathBuf>,
+    /// Talk to real devices (off for tests and the screenshot tour).
+    pub hardware: bool,
 }
 
 pub struct App {
@@ -73,11 +80,21 @@ impl App {
             (loaded.lib, Some(path))
         };
         let look = (lib.prefs.theme, lib.prefs.accent.clone());
-        theme::apply(ctx, &Palette::new(look.0, theme::parse_hex(&look.1).unwrap_or(Color32::from_rgb(0, 0xd4, 0xaa))));
-        let worker = Worker::spawn(ctx.clone(), lib.prefs.demo_devices);
+        theme::apply(
+            ctx,
+            &Palette::new(
+                look.0,
+                theme::parse_hex(&look.1).unwrap_or(Color32::from_rgb(0, 0xd4, 0xaa)),
+            ),
+        );
+        let worker = Worker::spawn(
+            ctx.clone(),
+            lib.prefs.demo_devices,
+            opts.hardware && opts.screenshot_dir.is_none(),
+        );
         Self {
             worker,
-            macros: MacroEngine,
+            macros: MacroEngine::default(),
             devices: Vec::new(),
             issues: Vec::new(),
             banner_dismissed: false,
@@ -122,6 +139,7 @@ impl App {
             Event::DeviceAdded(snap) => {
                 let announce = !snap.descriptor.simulated;
                 let name = snap.descriptor.name.clone();
+                let id = snap.descriptor.id.clone();
                 let view = DeviceView::new(*snap);
                 match self.devices.iter().position(|d| d.desc.id == view.desc.id) {
                     Some(i) => self.devices[i] = view,
@@ -132,7 +150,9 @@ impl App {
                     }
                 }
                 if announce {
-                    self.toasts.push(ToastKind::Success, format!("{name} connected"));
+                    self.toasts
+                        .push(ToastKind::Success, format!("{name} connected"));
+                    self.restore_profile(&id);
                 }
                 if self.selected.is_none() {
                     self.selected = self.devices.first().map(|d| d.desc.id.clone());
@@ -142,7 +162,8 @@ impl App {
                 if let Some(i) = self.devices.iter().position(|d| d.desc.id == id) {
                     let d = self.devices.remove(i);
                     if !d.desc.simulated {
-                        self.toasts.push(ToastKind::Info, format!("{} disconnected", d.desc.name));
+                        self.toasts
+                            .push(ToastKind::Info, format!("{} disconnected", d.desc.name));
                     }
                 }
                 self.debounce.retain(|k| k.0 != id);
@@ -191,10 +212,18 @@ impl App {
                 }
             }
             Event::Saved { id, error } => {
-                let name = self.devices.iter().find(|d| d.desc.id == id).map_or_else(|| "device".to_string(), |d| d.display_name().to_string());
+                let name = self
+                    .devices
+                    .iter()
+                    .find(|d| d.desc.id == id)
+                    .map_or_else(|| "device".to_string(), |d| d.display_name().to_string());
                 match error {
-                    None => self.toasts.push(ToastKind::Success, format!("Saved to {name}")),
-                    Some(e) => self.toasts.push(ToastKind::Error, format!("Could not save to {name}: {e}")),
+                    None => self
+                        .toasts
+                        .push(ToastKind::Success, format!("Saved to {name}")),
+                    Some(e) => self
+                        .toasts
+                        .push(ToastKind::Error, format!("Could not save to {name}: {e}")),
                 }
             }
             Event::Battery { id, battery } => {
@@ -217,17 +246,151 @@ impl App {
                     }
                 }
             }
-            Event::Button { id, button, down } => {
-                let action = self.devices.iter().find(|d| d.desc.id == id).and_then(|d| d.state.buttons.get(&button)).cloned();
-                if let Some(ButtonAction::Macro(mid)) = action {
-                    if down {
-                        self.macros.trigger_down(&mid, button);
-                    } else {
-                        self.macros.trigger_up(&mid, button);
-                    }
+            Event::Button { id, button, down } => self.on_button(&id, button, down),
+        }
+    }
+
+    // --- Profiles follow edits --------------------------------------------------
+
+    /// Keep the active profile in step with what the user changes, so their
+    /// setup comes back when the device reconnects or the app restarts.
+    fn record(&mut self, dev: &str, setting: &Setting) {
+        // The onboard slot is a device-side choice, and an empty per-key
+        // update only flushes a queue.
+        if matches!(setting, Setting::OnboardProfile(_))
+            || matches!(setting, Setting::PerKey(m) if m.is_empty())
+        {
+            return;
+        }
+        let Some(model) = self
+            .devices
+            .iter()
+            .find(|d| d.desc.id == dev)
+            .map(|d| d.desc.model_key.clone())
+        else {
+            return;
+        };
+        let Some(active) = self.lib.active_profile.clone() else {
+            return;
+        };
+        let Some(profile) = self.lib.profile_mut(&active) else {
+            return;
+        };
+        let list = profile.devices.entry(model).or_default();
+        let key = setting_key(setting);
+        match list.iter().position(|s| setting_key(s) == key) {
+            Some(i) => {
+                let old = list[i].clone();
+                list[i] = merge_settings(old, setting.clone());
+            }
+            None => list.push(setting.clone()),
+        }
+    }
+
+    /// Re-apply the active profile to a device that just connected, sending
+    /// only what differs from the device's current state — so a mouse whose
+    /// flash already matches isn't rewritten on every launch.
+    fn restore_profile(&mut self, dev: &str) {
+        let Some(d) = self.devices.iter().find(|d| d.desc.id == dev) else {
+            return;
+        };
+        let Some(saved) = self
+            .lib
+            .active_profile
+            .as_deref()
+            .and_then(|p| self.lib.profile(p))
+            .and_then(|p| p.devices.get(&d.desc.model_key))
+        else {
+            return;
+        };
+        let mut state = d.state.clone();
+        let mut changed = Vec::new();
+        for s in saved {
+            let mut next = state.clone();
+            s.apply_to(&mut next);
+            if next != state {
+                changed.push(s.clone());
+                state = next;
+            }
+        }
+        if changed.is_empty() {
+            return;
+        }
+        let Some(d) = self.view_mut(dev) else { return };
+        d.state = state;
+        d.pending += 1;
+        self.worker.send(Command::ApplySettings {
+            id: dev.to_string(),
+            settings: changed,
+        });
+    }
+
+    // --- Buttons handled in software ----------------------------------------------
+
+    fn on_button(&mut self, dev: &str, button: u16, down: bool) {
+        let trigger = format!("{dev}:{button}");
+        if !down {
+            self.macros.release(&trigger);
+            return;
+        }
+        let Some(action) = self
+            .devices
+            .iter()
+            .find(|d| d.desc.id == dev)
+            .and_then(|d| d.state.buttons.get(&button))
+            .cloned()
+        else {
+            return;
+        };
+        match action {
+            ButtonAction::Dpi(f) => self.step_dpi(dev, f),
+            ButtonAction::ProfileCycle => self.cycle_profile(),
+            other => {
+                if let Some(err) = self.macros.press(&trigger, &other, &self.lib.macros) {
+                    self.toasts.push(ToastKind::Error, err);
                 }
             }
         }
+    }
+
+    fn step_dpi(&mut self, dev: &str, f: DpiFunction) {
+        let Some(dpi) = self
+            .devices
+            .iter()
+            .find(|d| d.desc.id == dev)
+            .and_then(|d| d.state.dpi.clone())
+        else {
+            return;
+        };
+        let n = dpi.stages.len() as u8;
+        if n == 0 {
+            return;
+        }
+        let next = match f {
+            DpiFunction::Up => (dpi.active + 1).min(n - 1),
+            DpiFunction::Down => dpi.active.saturating_sub(1),
+            DpiFunction::Cycle => (dpi.active + 1) % n,
+            DpiFunction::Shift(_) => return,
+        };
+        if next != dpi.active {
+            self.apply(dev, Setting::DpiActiveStage(next), false);
+        }
+    }
+
+    fn cycle_profile(&mut self) {
+        let ids: Vec<String> = self.lib.profiles.iter().map(|p| p.id.clone()).collect();
+        if ids.len() < 2 {
+            return;
+        }
+        let at = self
+            .lib
+            .active_profile
+            .as_ref()
+            .and_then(|a| ids.iter().position(|i| i == a))
+            .unwrap_or(0);
+        let next = ids[(at + 1) % ids.len()].clone();
+        self.lib.active_profile = Some(next.clone());
+        self.apply_profile(&next, true);
     }
 
     // --- Applying settings -----------------------------------------------------
@@ -235,17 +398,22 @@ impl App {
     fn send_apply(&mut self, dev: &str, setting: Setting) {
         if let Some(d) = self.view_mut(dev) {
             d.pending += 1;
-            self.worker.send(Command::Apply { id: dev.to_string(), setting });
+            self.worker.send(Command::Apply {
+                id: dev.to_string(),
+                setting,
+            });
         }
     }
 
     /// Update the UI state right away, then send now or after the debounce delay.
     pub(crate) fn apply(&mut self, dev: &str, setting: Setting, debounce: bool) {
         let key = (dev.to_string(), setting_key(&setting));
+        self.record(dev, &setting);
         let Some(d) = self.view_mut(dev) else { return };
         setting.apply_to(&mut d.state);
         if debounce {
-            self.debounce.push(key, setting, Instant::now(), merge_settings);
+            self.debounce
+                .push(key, setting, Instant::now(), merge_settings);
             return;
         }
         let merged = match self.debounce.take(&key) {
@@ -262,12 +430,18 @@ impl App {
         if settings.is_empty() {
             return;
         }
+        for st in &settings {
+            self.record(dev, st);
+        }
         let Some(d) = self.view_mut(dev) else { return };
         for s in &settings {
             s.apply_to(&mut d.state);
         }
         d.pending += 1;
-        self.worker.send(Command::ApplySettings { id: dev.to_string(), settings });
+        self.worker.send(Command::ApplySettings {
+            id: dev.to_string(),
+            settings,
+        });
     }
 
     fn flush_debounced(&mut self, ctx: &Context) {
@@ -281,11 +455,19 @@ impl App {
 
     /// Send a profile's settings to every connected device it covers.
     fn apply_profile(&mut self, id: &str, activating: bool) {
-        let Some(profile) = self.lib.profile(id).cloned() else { return };
+        let Some(profile) = self.lib.profile(id).cloned() else {
+            return;
+        };
         let targets: Vec<(String, Vec<Setting>)> = self
             .devices
             .iter()
-            .filter_map(|d| profile.devices.get(&d.desc.model_key).filter(|s| !s.is_empty()).map(|s| (d.desc.id.clone(), s.clone())))
+            .filter_map(|d| {
+                profile
+                    .devices
+                    .get(&d.desc.model_key)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| (d.desc.id.clone(), s.clone()))
+            })
             .collect();
         let n = targets.len();
         for (dev, settings) in targets {
@@ -293,30 +475,54 @@ impl App {
         }
         let msg = match (n, activating) {
             (0, true) => format!("“{}” is now active", profile.name),
-            (0, false) => format!("“{}” has nothing saved for the connected devices", profile.name),
-            (n, _) => format!("“{}” applied to {n} device{}", profile.name, if n == 1 { "" } else { "s" }),
+            (0, false) => format!(
+                "“{}” has nothing saved for the connected devices",
+                profile.name
+            ),
+            (n, _) => format!(
+                "“{}” applied to {n} device{}",
+                profile.name,
+                if n == 1 { "" } else { "s" }
+            ),
         };
         self.toasts.push(ToastKind::Success, msg);
     }
 
     fn save_to_profile(&mut self, dev: &str) {
-        let Some(active) = self.lib.active_profile.clone().filter(|id| self.lib.profile(id).is_some()) else {
-            self.toasts.push(ToastKind::Error, "No active profile. Create one on the Profiles page first.");
+        let Some(active) = self
+            .lib
+            .active_profile
+            .clone()
+            .filter(|id| self.lib.profile(id).is_some())
+        else {
+            self.toasts.push(
+                ToastKind::Error,
+                "No active profile. Create one on the Profiles page first.",
+            );
             return;
         };
-        let Some(d) = self.devices.iter().find(|d| d.desc.id == dev) else { return };
+        let Some(d) = self.devices.iter().find(|d| d.desc.id == dev) else {
+            return;
+        };
         let settings = settings_from_state(&d.caps, &d.state);
         let (key, n) = (d.desc.model_key.clone(), settings.len());
         if let Some(p) = self.lib.profile_mut(&active) {
             p.devices.insert(key, settings);
             let name = p.name.clone();
-            self.toasts.push(ToastKind::Success, format!("Saved {n} settings to “{name}”"));
+            self.toasts.push(
+                ToastKind::Success,
+                format!("Saved {n} settings to “{name}”"),
+            );
         }
     }
 
     pub(crate) fn dispatch(&mut self, action: Action, ctx: &Context) {
         match action {
-            Action::Apply { dev, setting, debounce } => self.apply(&dev, setting, debounce),
+            Action::Apply {
+                dev,
+                setting,
+                debounce,
+            } => self.apply(&dev, setting, debounce),
             Action::ApplyMany { dev, settings } => self.apply_many(&dev, settings),
             Action::SaveOnboard(id) => self.worker.send(Command::SaveOnboard { id }),
             Action::SaveToProfile(dev) => self.save_to_profile(&dev),
@@ -369,14 +575,23 @@ impl App {
 
     fn write_library(&mut self) {
         if let Some(path) = &self.save_path
-            && let Err(e) = self.lib.save(path) {
-                self.toasts.push(ToastKind::Error, format!("Could not save settings: {e}"));
-            }
+            && let Err(e) = self.lib.save(path)
+        {
+            self.toasts
+                .push(ToastKind::Error, format!("Could not save settings: {e}"));
+        }
     }
 
     fn current_device(&self) -> Option<usize> {
-        let by_id = self.selected.as_deref().and_then(|id| self.devices.iter().position(|d| d.desc.id == id));
-        by_id.or(if self.devices.is_empty() { None } else { Some(0) })
+        let by_id = self
+            .selected
+            .as_deref()
+            .and_then(|id| self.devices.iter().position(|d| d.desc.id == id));
+        by_id.or(if self.devices.is_empty() {
+            None
+        } else {
+            Some(0)
+        })
     }
 
     // --- UI ------------------------------------------------------------------------
@@ -425,20 +640,49 @@ impl App {
     fn central(&mut self, ui: &mut Ui, pal: &Palette, out: &mut Vec<Action>) {
         self.banner(ui, pal, out);
         let scroll = |ui: &mut Ui, add: &mut dyn FnMut(&mut Ui)| {
-            ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                add(ui);
-                ui.add_space(24.0);
-            });
+            ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    add(ui);
+                    ui.add_space(24.0);
+                });
         };
         match self.route {
             Route::Device => match self.current_device() {
-                Some(i) => pages::device::show(ui, &mut self.pages, &self.devices[i], &self.lib, &self.keys, &mut self.tab, out),
+                Some(i) => pages::device::show(
+                    ui,
+                    &mut self.pages,
+                    &self.devices[i],
+                    &self.lib,
+                    &self.keys,
+                    &mut self.tab,
+                    out,
+                ),
                 None => pages::empty::show(ui, out),
             },
-            Route::Profiles => scroll(ui, &mut |ui| pages::profiles::show(ui, &mut self.pages.profiles, &mut self.lib, &self.devices, out)),
-            Route::Macros => scroll(ui, &mut |ui| pages::macros::show(ui, &mut self.pages.macros, &mut self.lib, &self.devices, &self.keys, out)),
-            Route::Settings => scroll(ui, &mut |ui| pages::settings::show(ui, &mut self.pages.settings, &mut self.lib, out)),
+            Route::Profiles => scroll(ui, &mut |ui| {
+                pages::profiles::show(
+                    ui,
+                    &mut self.pages.profiles,
+                    &mut self.lib,
+                    &self.devices,
+                    out,
+                )
+            }),
+            Route::Macros => scroll(ui, &mut |ui| {
+                pages::macros::show(
+                    ui,
+                    &mut self.pages.macros,
+                    &mut self.lib,
+                    &self.devices,
+                    &self.keys,
+                    out,
+                )
+            }),
+            Route::Settings => scroll(ui, &mut |ui| {
+                pages::settings::show(ui, &mut self.pages.settings, &mut self.lib, out)
+            }),
         }
     }
 }
@@ -447,7 +691,11 @@ impl eframe::App for App {
     fn logic(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.pump_worker();
         // Hide key presses from widgets while a page is capturing them.
-        self.keys = if self.pages.wants_keys() { keymap::take_key_events(ctx) } else { Vec::new() };
+        self.keys = if self.pages.wants_keys() {
+            keymap::take_key_events(ctx)
+        } else {
+            Vec::new()
+        };
         self.flush_debounced(ctx);
         self.sync_look(ctx);
         self.autosave(ctx);
@@ -459,14 +707,27 @@ impl eframe::App for App {
         let pal = palette(&ctx);
         let mut out: Vec<Action> = Vec::new();
 
-        let nav = Nav { devices: &self.devices, selected: self.selected.as_deref(), route: self.route, lib: &self.lib };
+        let nav = Nav {
+            devices: &self.devices,
+            selected: self.selected.as_deref(),
+            route: self.route,
+            lib: &self.lib,
+        };
         Panel::left("sidebar")
             .exact_size(252.0)
             .resizable(false)
-            .frame(Frame::new().fill(pal.sidebar).inner_margin(Margin::same(14)))
+            .frame(
+                Frame::new()
+                    .fill(pal.sidebar)
+                    .inner_margin(Margin::same(14)),
+            )
             .show(ui, |ui| sidebar::show(ui, &nav, &mut out));
         egui::CentralPanel::default()
-            .frame(Frame::new().fill(pal.window).inner_margin(Margin::symmetric(28, 18)))
+            .frame(
+                Frame::new()
+                    .fill(pal.window)
+                    .inner_margin(Margin::symmetric(28, 18)),
+            )
             .show(ui, |ui| self.central(ui, &pal, &mut out));
         self.toasts.show(&ctx);
 

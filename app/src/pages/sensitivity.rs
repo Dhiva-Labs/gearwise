@@ -1,6 +1,9 @@
 //! Sensitivity tab: DPI stages, the scale visualisation and per-stage editing.
 
-use egui::{Align, Align2, Color32, CornerRadius, DragValue, FontId, Layout, Sense, Slider, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{
+    Align, Align2, Color32, CornerRadius, DragValue, FontId, Layout, Sense, Slider, Stroke,
+    StrokeKind, Ui, pos2, vec2,
+};
 use periph_core::device::Setting;
 use periph_core::model::{DpiCaps, DpiStage, DpiState};
 
@@ -64,7 +67,13 @@ pub fn show(ui: &mut Ui, st: &mut SensState, dev: &DeviceView, out: &mut Vec<Act
             widgets::caption(ui, format!("{} of {}", dpi.stages.len(), caps.max_stages));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let can_add = dpi.stages.len() < caps.max_stages as usize;
-                if ui.add_enabled_ui(can_add, |ui| widgets::primary(ui, Some(Icon::Plus), "Add stage")).inner.clicked() {
+                if ui
+                    .add_enabled_ui(can_add, |ui| {
+                        widgets::primary(ui, Some(Icon::Plus), "Add stage")
+                    })
+                    .inner
+                    .clicked()
+                {
                     let last = dpi.stages.last().map_or(caps.min, |s| s.x);
                     let v = caps.snap(last.saturating_mul(2).min(caps.max));
                     dpi.stages.push(DpiStage::uniform(v));
@@ -84,7 +93,16 @@ pub fn show(ui: &mut Ui, st: &mut SensState, dev: &DeviceView, out: &mut Vec<Act
             if i > 0 {
                 widgets::divider(ui);
             }
-            let res = stage_row(ui, i, i == active, &mut dpi.stages[i], caps, st.separate, n > 1, &pal);
+            let res = stage_row(
+                ui,
+                i,
+                i == active,
+                &mut dpi.stages[i],
+                caps,
+                st.separate,
+                n > 1,
+                &pal,
+            );
             if res.activate {
                 new_active = Some(i as u8);
             }
@@ -106,9 +124,17 @@ pub fn show(ui: &mut Ui, st: &mut SensState, dev: &DeviceView, out: &mut Vec<Act
 
     let id = dev.desc.id.clone();
     if let Some(c) = commit {
-        out.push(Action::Apply { dev: id, setting: Setting::Dpi(dpi), debounce: c == Commit::Soon });
+        out.push(Action::Apply {
+            dev: id,
+            setting: Setting::Dpi(dpi),
+            debounce: c == Commit::Soon,
+        });
     } else if let Some(i) = new_active.filter(|i| *i != state.active) {
-        out.push(Action::Apply { dev: id, setting: Setting::DpiActiveStage(i), debounce: false });
+        out.push(Action::Apply {
+            dev: id,
+            setting: Setting::DpiActiveStage(i),
+            debounce: false,
+        });
     }
 }
 
@@ -119,12 +145,32 @@ struct RowResult {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn stage_row(ui: &mut Ui, i: usize, active: bool, stage: &mut DpiStage, caps: &DpiCaps, separate: bool, can_remove: bool, pal: &Palette) -> RowResult {
-    let mut res = RowResult { commit: None, activate: false, remove: false };
+fn stage_row(
+    ui: &mut Ui,
+    i: usize,
+    active: bool,
+    stage: &mut DpiStage,
+    caps: &DpiCaps,
+    separate: bool,
+    can_remove: bool,
+    pal: &Palette,
+) -> RowResult {
+    let mut res = RowResult {
+        commit: None,
+        activate: false,
+        remove: false,
+    };
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 14.0;
-        if chip(ui, i, active, pal).on_hover_text(if active { "Active stage" } else { "Make this the active stage" }).clicked() {
+        if chip(ui, i, active, pal)
+            .on_hover_text(if active {
+                "Active stage"
+            } else {
+                "Make this the active stage"
+            })
+            .clicked()
+        {
             res.activate = true;
         }
         let slider_w = (ui.available_width() - 150.0 - 36.0 - 28.0).max(120.0);
@@ -147,7 +193,13 @@ fn stage_row(ui: &mut Ui, i: usize, active: bool, stage: &mut DpiStage, caps: &D
             }
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if ui.add_enabled_ui(can_remove, |ui| widgets::icon_button(ui, Icon::Trash, "Remove stage")).inner.clicked() {
+            if ui
+                .add_enabled_ui(can_remove, |ui| {
+                    widgets::icon_button(ui, Icon::Trash, "Remove stage")
+                })
+                .inner
+                .clicked()
+            {
                 res.remove = true;
             }
             if active {
@@ -159,24 +211,44 @@ fn stage_row(ui: &mut Ui, i: usize, active: bool, stage: &mut DpiStage, caps: &D
     res
 }
 
-fn axis(ui: &mut Ui, label: &str, v: &mut u16, caps: &DpiCaps, slider_w: f32, commit: &mut Option<Commit>) {
+fn axis(
+    ui: &mut Ui,
+    label: &str,
+    v: &mut u16,
+    caps: &DpiCaps,
+    slider_w: f32,
+    commit: &mut Option<Commit>,
+) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;
         if !label.is_empty() {
-            ui.allocate_ui_with_layout(vec2(14.0, 20.0), Layout::left_to_right(Align::Center), |ui| {
-                widgets::muted(ui, label);
-            });
+            ui.allocate_ui_with_layout(
+                vec2(14.0, 20.0),
+                Layout::left_to_right(Align::Center),
+                |ui| {
+                    widgets::muted(ui, label);
+                },
+            );
         }
         let mut x = *v;
         ui.spacing_mut().slider_width = slider_w - if label.is_empty() { 0.0 } else { 26.0 };
-        let s = ui.add(Slider::new(&mut x, caps.min..=caps.max).logarithmic(true).show_value(false));
+        let s = ui.add(
+            Slider::new(&mut x, caps.min..=caps.max)
+                .logarithmic(true)
+                .show_value(false),
+        );
         if s.changed() {
             *commit = Some(Commit::Soon);
         }
         if s.drag_stopped() || s.lost_focus() {
             *commit = Some(Commit::Now);
         }
-        let d = ui.add(DragValue::new(&mut x).range(caps.min..=caps.max).speed(f32::from(caps.step.max(1))).suffix(" DPI"));
+        let d = ui.add(
+            DragValue::new(&mut x)
+                .range(caps.min..=caps.max)
+                .speed(f32::from(caps.step.max(1)))
+                .suffix(" DPI"),
+        );
         if d.changed() {
             *commit = Some(Commit::Soon);
         }
@@ -196,22 +268,51 @@ fn chip(ui: &mut Ui, i: usize, active: bool, pal: &Palette) -> egui::Response {
         p.circle_filled(center, 19.0, with_alpha(c, 50));
         p.circle_filled(center, 15.0, c);
     } else {
-        p.circle(center, 15.0, with_alpha(c, if resp.hovered() { 70 } else { 36 }), Stroke::new(1.5, with_alpha(c, 170)));
+        p.circle(
+            center,
+            15.0,
+            with_alpha(c, if resp.hovered() { 70 } else { 36 }),
+            Stroke::new(1.5, with_alpha(c, 170)),
+        );
     }
     let luma = 0.299 * f32::from(c.r()) + 0.587 * f32::from(c.g()) + 0.114 * f32::from(c.b());
-    let ink = if active { if luma > 150.0 { Color32::from_rgb(0x0b, 0x10, 0x14) } else { Color32::WHITE } } else if pal.dark { c } else { mix(c, Color32::BLACK, 0.4) };
-    p.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(14.0), ink);
+    let ink = if active {
+        if luma > 150.0 {
+            Color32::from_rgb(0x0b, 0x10, 0x14)
+        } else {
+            Color32::WHITE
+        }
+    } else if pal.dark {
+        c
+    } else {
+        mix(c, Color32::BLACK, 0.4)
+    };
+    p.text(
+        center,
+        Align2::CENTER_CENTER,
+        (i + 1).to_string(),
+        FontId::proportional(14.0),
+        ink,
+    );
     resp
 }
 
 /// Log-scale bar with a marker per stage; returns a clicked stage.
 fn scale_bar(ui: &mut Ui, caps: &DpiCaps, dpi: &DpiState, pal: &Palette) -> Option<u8> {
     let (rect, base) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
-    let track = egui::Rect::from_min_max(pos2(rect.min.x + 14.0, rect.min.y + 44.0), pos2(rect.max.x - 14.0, rect.min.y + 52.0));
+    let track = egui::Rect::from_min_max(
+        pos2(rect.min.x + 14.0, rect.min.y + 44.0),
+        pos2(rect.max.x - 14.0, rect.min.y + 52.0),
+    );
     let x_at = |v: u16| track.min.x + scale_pos(v, caps.min, caps.max) * track.width();
     let p = ui.painter();
     p.rect_filled(track, CornerRadius::same(4), pal.input);
-    p.rect_stroke(track, CornerRadius::same(4), Stroke::new(1.0, pal.border), StrokeKind::Inside);
+    p.rect_stroke(
+        track,
+        CornerRadius::same(4),
+        Stroke::new(1.0, pal.border),
+        StrokeKind::Inside,
+    );
 
     // Fill up to the active stage.
     if let Some(cur) = dpi.current() {
@@ -224,8 +325,18 @@ fn scale_bar(ui: &mut Ui, caps: &DpiCaps, dpi: &DpiState, pal: &Palette) -> Opti
             continue;
         }
         let x = x_at(t);
-        p.vline(x, track.max.y + 4.0..=track.max.y + 9.0, Stroke::new(1.0, pal.border));
-        p.text(pos2(x, track.max.y + 20.0), Align2::CENTER_CENTER, t.to_string(), FontId::proportional(11.0), pal.muted);
+        p.vline(
+            x,
+            track.max.y + 4.0..=track.max.y + 9.0,
+            Stroke::new(1.0, pal.border),
+        );
+        p.text(
+            pos2(x, track.max.y + 20.0),
+            Align2::CENTER_CENTER,
+            t.to_string(),
+            FontId::proportional(11.0),
+            pal.muted,
+        );
     }
     let mut clicked = None;
     let mut hovered = None;
@@ -240,7 +351,12 @@ fn scale_bar(ui: &mut Ui, caps: &DpiCaps, dpi: &DpiState, pal: &Palette) -> Opti
             p.circle_filled(center, 15.0, with_alpha(c, 55));
             p.circle(center, 10.0, c, Stroke::new(2.0, pal.card));
         } else {
-            p.circle(center, if resp.hovered() { 9.0 } else { 7.0 }, c, Stroke::new(2.0, pal.card));
+            p.circle(
+                center,
+                if resp.hovered() { 9.0 } else { 7.0 },
+                c,
+                Stroke::new(2.0, pal.card),
+            );
         }
         if resp.clicked() {
             clicked = Some(i as u8);
@@ -251,17 +367,29 @@ fn scale_bar(ui: &mut Ui, caps: &DpiCaps, dpi: &DpiState, pal: &Palette) -> Opti
     }
     let label_for = hovered.or_else(|| {
         let i = dpi.active as usize;
-        dpi.stages.get(i).map(|s| (i, pos2(x_at(s.x), track.center().y)))
+        dpi.stages
+            .get(i)
+            .map(|s| (i, pos2(x_at(s.x), track.center().y)))
     });
     if let Some((i, c)) = label_for {
         let s = dpi.stages[i];
-        let text = if s.x == s.y { format!("{} DPI", s.x) } else { format!("{} × {} DPI", s.x, s.y) };
+        let text = if s.x == s.y {
+            format!("{} DPI", s.x)
+        } else {
+            format!("{} × {} DPI", s.x, s.y)
+        };
         let p = ui.painter();
         let g = p.layout_no_wrap(text, FontId::proportional(13.0), pal.text);
         let size = g.size() + vec2(18.0, 10.0);
         let x = (c.x - size.x / 2.0).clamp(rect.min.x, rect.max.x - size.x);
         let r = egui::Rect::from_min_size(pos2(x, track.min.y - size.y - 14.0), size);
-        p.rect(r, CornerRadius::same(8), pal.raised, Stroke::new(1.0, stage_color(i)), StrokeKind::Inside);
+        p.rect(
+            r,
+            CornerRadius::same(8),
+            pal.raised,
+            Stroke::new(1.0, stage_color(i)),
+            StrokeKind::Inside,
+        );
         p.galley(r.min + vec2(9.0, 5.0), g, pal.text);
     }
     clicked

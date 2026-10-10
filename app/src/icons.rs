@@ -1,7 +1,9 @@
 //! Small vector icons drawn with the painter, so no font or image assets are needed.
 
 use egui::epaint::PathStroke;
-use egui::{Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, pos2, vec2};
+use egui::{
+    Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, pos2, vec2,
+};
 use periph_core::model::DeviceKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,7 +67,10 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
         p.line_segment([pt(a.0, a.1), pt(b.0, b.1)], st);
     };
     let poly = |pts: &[(f32, f32)]| {
-        p.add(Shape::line(pts.iter().map(|q| pt(q.0, q.1)).collect(), PathStroke::from(st)));
+        p.add(Shape::line(
+            pts.iter().map(|q| pt(q.0, q.1)).collect(),
+            PathStroke::from(st),
+        ));
     };
     let arc = |cx: f32, cy: f32, r: f32, from: f32, to: f32, n: usize| -> Vec<Pos2> {
         (0..=n)
@@ -76,7 +81,12 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
             .collect()
     };
     let rrect = |x0: f32, y0: f32, x1: f32, y1: f32, r: f32| {
-        p.rect_stroke(Rect::from_min_max(pt(x0, y0), pt(x1, y1)), CornerRadius::same((r * s) as u8), st, StrokeKind::Middle);
+        p.rect_stroke(
+            Rect::from_min_max(pt(x0, y0), pt(x1, y1)),
+            CornerRadius::same((r * s) as u8),
+            st,
+            StrokeKind::Middle,
+        );
     };
 
     match icon {
@@ -96,7 +106,10 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
             line((-0.2, 0.17), (0.2, 0.17));
         }
         Icon::Headset => {
-            p.add(Shape::line(arc(0.0, 0.04, 0.34, 180.0, 360.0, 16), PathStroke::from(st)));
+            p.add(Shape::line(
+                arc(0.0, 0.04, 0.34, 180.0, 360.0, 16),
+                PathStroke::from(st),
+            ));
             rrect(-0.42, 0.0, -0.24, 0.3, 0.07);
             rrect(0.24, 0.0, 0.42, 0.3, 0.07);
         }
@@ -116,7 +129,14 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
         }
         Icon::Bolt => {
             p.add(Shape::convex_polygon(
-                vec![pt(0.1, -0.46), pt(-0.26, 0.06), pt(-0.02, 0.06), pt(-0.1, 0.46), pt(0.26, -0.1), pt(0.02, -0.1)],
+                vec![
+                    pt(0.1, -0.46),
+                    pt(-0.26, 0.06),
+                    pt(-0.02, 0.06),
+                    pt(-0.1, 0.46),
+                    pt(0.26, -0.1),
+                    pt(0.02, -0.1),
+                ],
                 color,
                 Stroke::NONE,
             ));
@@ -134,7 +154,13 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
         }
         Icon::Copy => {
             rrect(-0.1, -0.1, 0.36, 0.36, 0.07);
-            poly(&[(0.1, -0.1), (0.1, -0.36), (-0.36, -0.36), (-0.36, 0.1), (-0.1, 0.1)]);
+            poly(&[
+                (0.1, -0.1),
+                (0.1, -0.36),
+                (-0.36, -0.36),
+                (-0.36, 0.1),
+                (-0.1, 0.1),
+            ]);
         }
         Icon::Check => poly(&[(-0.32, 0.02), (-0.1, 0.24), (0.34, -0.22)]),
         Icon::Close => {
@@ -152,16 +178,27 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
         }
         Icon::User => {
             p.circle_stroke(pt(0.0, -0.17), 0.14 * s, st);
-            p.add(Shape::line(arc(0.0, 0.4, 0.3, 180.0, 360.0, 12), PathStroke::from(st)));
+            p.add(Shape::line(
+                arc(0.0, 0.4, 0.3, 180.0, 360.0, 12),
+                PathStroke::from(st),
+            ));
         }
         Icon::Play => {
-            p.add(Shape::convex_polygon(vec![pt(-0.2, -0.3), pt(0.3, 0.0), pt(-0.2, 0.3)], color, Stroke::NONE));
+            p.add(Shape::convex_polygon(
+                vec![pt(-0.2, -0.3), pt(0.3, 0.0), pt(-0.2, 0.3)],
+                color,
+                Stroke::NONE,
+            ));
         }
         Icon::Record => {
             p.circle_filled(pt(0.0, 0.0), 0.26 * s, color);
         }
         Icon::Stop => {
-            p.rect_filled(Rect::from_min_max(pt(-0.24, -0.24), pt(0.24, 0.24)), CornerRadius::same(2), color);
+            p.rect_filled(
+                Rect::from_min_max(pt(-0.24, -0.24), pt(0.24, 0.24)),
+                CornerRadius::same(2),
+                color,
+            );
         }
         Icon::Save | Icon::Download => {
             poly(&[(0.0, -0.4), (0.0, 0.12)]);
@@ -190,13 +227,24 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
             p.add(Shape::closed_line(pts, PathStroke::from(st)));
         }
         Icon::Gauge => {
-            p.add(Shape::line(arc(0.0, 0.1, 0.4, 153.0, 387.0, 20), PathStroke::from(st)));
+            p.add(Shape::line(
+                arc(0.0, 0.1, 0.4, 153.0, 387.0, 20),
+                PathStroke::from(st),
+            ));
             line((0.0, 0.1), (0.2, -0.12));
             p.circle_filled(pt(0.0, 0.1), w * 0.8, color);
         }
         Icon::Cursor => {
             p.add(Shape::convex_polygon(
-                vec![pt(-0.22, -0.34), pt(0.3, 0.06), pt(0.04, 0.1), pt(0.16, 0.36), pt(0.04, 0.4), pt(-0.08, 0.14), pt(-0.22, 0.28)],
+                vec![
+                    pt(-0.22, -0.34),
+                    pt(0.3, 0.06),
+                    pt(0.04, 0.1),
+                    pt(0.16, 0.36),
+                    pt(0.04, 0.4),
+                    pt(-0.08, 0.14),
+                    pt(-0.22, 0.28),
+                ],
                 Color32::TRANSPARENT,
                 st,
             ));
@@ -207,7 +255,13 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
             p.circle_filled(pt(0.0, -0.18), w * 0.7, color);
         }
         Icon::Layers => {
-            poly(&[(-0.4, -0.08), (0.0, -0.3), (0.4, -0.08), (0.0, 0.14), (-0.4, -0.08)]);
+            poly(&[
+                (-0.4, -0.08),
+                (0.0, -0.3),
+                (0.4, -0.08),
+                (0.0, 0.14),
+                (-0.4, -0.08),
+            ]);
             poly(&[(-0.4, 0.1), (0.0, 0.32), (0.4, 0.1)]);
         }
         Icon::Warning => {
@@ -217,16 +271,33 @@ pub fn paint(p: &Painter, rect: Rect, icon: Icon, color: Color32) {
         }
         Icon::Macro => {
             rrect(-0.4, -0.3, 0.4, 0.3, 0.1);
-            p.add(Shape::convex_polygon(vec![pt(-0.1, -0.14), pt(0.16, 0.0), pt(-0.1, 0.14)], color, Stroke::NONE));
+            p.add(Shape::convex_polygon(
+                vec![pt(-0.1, -0.14), pt(0.16, 0.0), pt(-0.1, 0.14)],
+                color,
+                Stroke::NONE,
+            ));
         }
         Icon::Edit => {
-            poly(&[(-0.34, 0.34), (-0.3, 0.12), (0.16, -0.34), (0.34, -0.16), (-0.12, 0.3), (-0.34, 0.34)]);
+            poly(&[
+                (-0.34, 0.34),
+                (-0.3, 0.12),
+                (0.16, -0.34),
+                (0.34, -0.16),
+                (-0.12, 0.3),
+                (-0.34, 0.34),
+            ]);
             line((0.04, -0.22), (0.22, -0.04));
         }
         Icon::Eyedropper => {
             line((-0.34, 0.34), (0.06, -0.06));
             poly(&[(0.0, -0.12), (0.18, 0.06)]);
-            poly(&[(0.0, -0.3), (0.3, 0.0), (0.4, -0.2), (0.2, -0.4), (0.0, -0.3)]);
+            poly(&[
+                (0.0, -0.3),
+                (0.3, 0.0),
+                (0.4, -0.2),
+                (0.2, -0.4),
+                (0.0, -0.3),
+            ]);
         }
     }
 }

@@ -7,8 +7,8 @@ pub mod empty;
 pub mod info;
 pub mod lighting;
 pub mod macros;
-pub mod performance;
 pub mod per_key;
+pub mod performance;
 pub mod picker;
 pub mod profiles;
 pub mod sensitivity;
@@ -20,7 +20,10 @@ use periph_core::profile::Library;
 /// Human label for an action, resolving macro ids to their names.
 pub fn action_label(a: &ButtonAction, lib: &Library) -> String {
     match a {
-        ButtonAction::Macro(id) => lib.macro_by_id(id).map_or_else(|| "Missing macro".to_string(), |m| format!("Macro: {}", m.name)),
+        ButtonAction::Macro(id) => lib.macro_by_id(id).map_or_else(
+            || "Missing macro".to_string(),
+            |m| format!("Macro: {}", m.name),
+        ),
         other => other.label(),
     }
 }
@@ -57,8 +60,14 @@ mod tests {
         let m = Macro::new("Rapid click");
         let id = m.id.clone();
         lib.macros.push(m);
-        assert_eq!(action_label(&ButtonAction::Macro(id), &lib), "Macro: Rapid click");
-        assert_eq!(action_label(&ButtonAction::Macro("gone".into()), &lib), "Missing macro");
+        assert_eq!(
+            action_label(&ButtonAction::Macro(id), &lib),
+            "Macro: Rapid click"
+        );
+        assert_eq!(
+            action_label(&ButtonAction::Macro("gone".into()), &lib),
+            "Missing macro"
+        );
         assert_eq!(action_label(&ButtonAction::Disabled, &lib), "Disabled");
     }
 
@@ -66,25 +75,47 @@ mod tests {
     fn demo_views() -> Vec<DeviceView> {
         let demo = periph_core::demo::devices().into_iter().map(|mut d| {
             let state = d.read_state().unwrap();
-            DeviceView::new(DeviceSnapshot { descriptor: d.descriptor().clone(), capabilities: d.capabilities().clone(), state })
+            DeviceView::new(DeviceSnapshot {
+                descriptor: d.descriptor().clone(),
+                capabilities: d.capabilities().clone(),
+                state,
+            })
         });
-        demo.chain(crate::screenshot::extra_devices().into_iter().map(DeviceView::new)).collect()
+        demo.chain(
+            crate::screenshot::extra_devices()
+                .into_iter()
+                .map(DeviceView::new),
+        )
+        .collect()
     }
 
     /// Tiny deterministic generator so the "monkey" below is repeatable.
     struct Lcg(u64);
     impl Lcg {
         fn next(&mut self) -> f32 {
-            self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             (self.0 >> 40) as f32 / (1u64 << 24) as f32
         }
     }
 
     /// Draw `page` for a few frames, then click and drag at random points, folding the
     /// actions it emits back into the device like the app does.
-    fn monkey(seed: u64, views: &mut [DeviceView], mut page: impl FnMut(&mut egui::Ui, &mut [DeviceView], &mut Vec<Action>)) {
+    fn monkey(
+        seed: u64,
+        views: &mut [DeviceView],
+        mut page: impl FnMut(&mut egui::Ui, &mut [DeviceView], &mut Vec<Action>),
+    ) {
         let ctx = egui::Context::default();
-        crate::theme::apply(&ctx, &crate::theme::Palette::new(periph_core::profile::Theme::Dark, egui::Color32::from_rgb(0, 212, 170)));
+        crate::theme::apply(
+            &ctx,
+            &crate::theme::Palette::new(
+                periph_core::profile::Theme::Dark,
+                egui::Color32::from_rgb(0, 212, 170),
+            ),
+        );
         let mut rng = Lcg(seed);
         let screen = Rect::from_min_size(Pos2::ZERO, vec2(1100.0, 760.0));
         let mut t = 0.0;
@@ -94,16 +125,36 @@ mod tests {
                 let pos = Pos2::new(rng.next() * screen.width(), rng.next() * screen.height());
                 events.push(Event::PointerMoved(pos));
                 if frame % 3 == 0 {
-                    let m = egui::Modifiers { shift: rng.next() > 0.7, ..Default::default() };
-                    events.push(Event::PointerButton { pos, button: PointerButton::Primary, pressed: true, modifiers: m });
+                    let m = egui::Modifiers {
+                        shift: rng.next() > 0.7,
+                        ..Default::default()
+                    };
+                    events.push(Event::PointerButton {
+                        pos,
+                        button: PointerButton::Primary,
+                        pressed: true,
+                        modifiers: m,
+                    });
                 } else if frame % 3 == 1 {
-                    events.push(Event::PointerButton { pos, button: PointerButton::Primary, pressed: false, modifiers: Default::default() });
+                    events.push(Event::PointerButton {
+                        pos,
+                        button: PointerButton::Primary,
+                        pressed: false,
+                        modifiers: Default::default(),
+                    });
                 }
             }
             t += 0.016;
-            let input = RawInput { screen_rect: Some(screen), time: Some(t), events, ..Default::default() };
+            let input = RawInput {
+                screen_rect: Some(screen),
+                time: Some(t),
+                events,
+                ..Default::default()
+            };
             let mut out = Vec::new();
-            ctx.run_ui(input, |ui| page(ui, views, &mut out)).textures_delta.clear();
+            ctx.run_ui(input, |ui| page(ui, views, &mut out))
+                .textures_delta
+                .clear();
             for a in out {
                 match a {
                     Action::Apply { dev, setting, .. } => {
@@ -135,7 +186,10 @@ mod tests {
                     monkey(seed * 31 + idx as u64, &mut views, |ui, views, out| {
                         device::show(ui, &mut st, &views[idx], &lib, &[], &mut t, out);
                     });
-                    assert_eq!(t, tab, "tab selection is only changed by clicking the tab bar");
+                    assert_eq!(
+                        t, tab,
+                        "tab selection is only changed by clicking the tab bar"
+                    );
                 }
             }
         }

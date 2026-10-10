@@ -39,8 +39,18 @@ pub struct Interaction {
 /// Which margin a button's label goes in.
 pub fn side_for(role: Option<Role>, anchor: Pos2, centre_x: f32) -> Side {
     match role {
-        Some(Role::Left | Role::TiltLeft | Role::Back | Role::Forward | Role::Sniper | Role::Grid(_)) => Side::Left,
-        Some(Role::Right | Role::TiltRight | Role::Middle | Role::DpiUp | Role::DpiDown | Role::DpiCycle | Role::Profile) => Side::Right,
+        Some(
+            Role::Left | Role::TiltLeft | Role::Back | Role::Forward | Role::Sniper | Role::Grid(_),
+        ) => Side::Left,
+        Some(
+            Role::Right
+            | Role::TiltRight
+            | Role::Middle
+            | Role::DpiUp
+            | Role::DpiDown
+            | Role::DpiCycle
+            | Role::Profile,
+        ) => Side::Right,
         None => {
             if anchor.x < centre_x {
                 Side::Left
@@ -59,7 +69,9 @@ pub fn stack(desired: &[f32], gap: f32, lo: f32, hi: f32) -> Vec<f32> {
         return Vec::new();
     }
     if n > 1 && (hi - lo) < gap * (n - 1) as f32 {
-        return (0..n).map(|i| lo + (hi - lo) * i as f32 / (n - 1) as f32).collect();
+        return (0..n)
+            .map(|i| lo + (hi - lo) * i as f32 / (n - 1) as f32)
+            .collect();
     }
     let mut y: Vec<f32> = desired.iter().map(|d| d.clamp(lo, hi)).collect();
     for i in 1..n {
@@ -76,21 +88,44 @@ pub fn stack(desired: &[f32], gap: f32, lo: f32, hi: f32) -> Vec<f32> {
 
 /// Draw the callouts inside `bounds` and report hover and clicks. `hover_hint` is a
 /// button hovered elsewhere (the list), highlighted here too.
-pub fn show(ui: &mut Ui, bounds: Rect, pill_w: f32, items: &[Callout], selected: Option<u16>, hover_hint: Option<u16>, pal: &Palette) -> Interaction {
+pub fn show(
+    ui: &mut Ui,
+    bounds: Rect,
+    pill_w: f32,
+    items: &[Callout],
+    selected: Option<u16>,
+    hover_hint: Option<u16>,
+    pal: &Palette,
+) -> Interaction {
     let mut out = Interaction::default();
     let base = ui.id().with("callouts");
     let shown = |c: &Callout| !c.compact || selected == Some(c.id) || hover_hint == Some(c.id);
 
     let mut laid: Vec<(usize, Rect, [Pos2; 3])> = Vec::new();
     for side in [Side::Left, Side::Right] {
-        let mut idx: Vec<usize> = (0..items.len()).filter(|i| items[*i].side == side && shown(&items[*i])).collect();
+        let mut idx: Vec<usize> = (0..items.len())
+            .filter(|i| items[*i].side == side && shown(&items[*i]))
+            .collect();
         idx.sort_by(|a, b| items[*a].anchor.y.total_cmp(&items[*b].anchor.y));
         let desired: Vec<f32> = idx.iter().map(|i| items[*i].anchor.y).collect();
-        let ys = stack(&desired, PILL_H + GAP, bounds.min.y + PILL_H / 2.0, bounds.max.y - PILL_H / 2.0);
+        let ys = stack(
+            &desired,
+            PILL_H + GAP,
+            bounds.min.y + PILL_H / 2.0,
+            bounds.max.y - PILL_H / 2.0,
+        );
         for (i, y) in idx.into_iter().zip(ys) {
-            let x = if side == Side::Left { bounds.min.x } else { bounds.max.x - pill_w };
+            let x = if side == Side::Left {
+                bounds.min.x
+            } else {
+                bounds.max.x - pill_w
+            };
             let pill = Rect::from_min_size(pos2(x, y - PILL_H / 2.0), vec2(pill_w, PILL_H));
-            let edge = if side == Side::Left { pos2(pill.max.x, y) } else { pos2(pill.min.x, y) };
+            let edge = if side == Side::Left {
+                pos2(pill.max.x, y)
+            } else {
+                pos2(pill.min.x, y)
+            };
             let elbow = pos2(edge.x + if side == Side::Left { 18.0 } else { -18.0 }, y);
             laid.push((i, pill, [items[i].anchor, elbow, edge]));
         }
@@ -99,9 +134,21 @@ pub fn show(ui: &mut Ui, bounds: Rect, pill_w: f32, items: &[Callout], selected:
     // Interaction first, so painting can show the hover state of this very frame.
     let mut over = vec![false; items.len()];
     for (n, c) in items.iter().enumerate() {
-        let sense = if c.enabled { Sense::click() } else { Sense::hover() };
-        let dot = if c.compact { vec2(15.0, 15.0) } else { vec2(22.0, 22.0) };
-        let mut resps = vec![ui.interact(Rect::from_center_size(c.anchor, dot), base.with(("dot", c.id)), sense)];
+        let sense = if c.enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let dot = if c.compact {
+            vec2(15.0, 15.0)
+        } else {
+            vec2(22.0, 22.0)
+        };
+        let mut resps = vec![ui.interact(
+            Rect::from_center_size(c.anchor, dot),
+            base.with(("dot", c.id)),
+            sense,
+        )];
         if let Some((_, pill, _)) = laid.iter().find(|(i, ..)| *i == n) {
             resps.push(ui.interact(*pill, base.with(("pill", c.id)), sense));
         }
@@ -126,22 +173,75 @@ pub fn show(ui: &mut Ui, bounds: Rect, pill_w: f32, items: &[Callout], selected:
         let c = &items[*i];
         let is_sel = selected == Some(c.id);
         let lit = lit(*i, c);
-        let line_col = if lit { with_alpha(pal.accent, 230) } else { with_alpha(pal.muted, 120) };
-        p.add(Shape::line(line.to_vec(), Stroke::new(if lit { 1.5 } else { 1.0 }, line_col)));
+        let line_col = if lit {
+            with_alpha(pal.accent, 230)
+        } else {
+            with_alpha(pal.muted, 120)
+        };
+        p.add(Shape::line(
+            line.to_vec(),
+            Stroke::new(if lit { 1.5 } else { 1.0 }, line_col),
+        ));
         if !c.compact {
             if lit {
                 p.circle_filled(c.anchor, 11.0, with_alpha(pal.accent, 44));
             }
-            p.circle(c.anchor, if lit { 5.5 } else { 4.5 }, if c.custom || lit { pal.accent } else { pal.card }, Stroke::new(1.5, if lit || c.custom { pal.accent } else { pal.muted }));
+            p.circle(
+                c.anchor,
+                if lit { 5.5 } else { 4.5 },
+                if c.custom || lit {
+                    pal.accent
+                } else {
+                    pal.card
+                },
+                Stroke::new(
+                    1.5,
+                    if lit || c.custom {
+                        pal.accent
+                    } else {
+                        pal.muted
+                    },
+                ),
+            );
         }
-        let fill = if lit { mix(pal.card, pal.accent, 0.14) } else { pal.card };
-        let border = if lit { pal.accent } else { mix(pal.border, pal.text, 0.1) };
-        p.rect(*pill, CornerRadius::same(10), fill, Stroke::new(if is_sel { 1.6 } else { 1.0 }, border), StrokeKind::Inside);
+        let fill = if lit {
+            mix(pal.card, pal.accent, 0.14)
+        } else {
+            pal.card
+        };
+        let border = if lit {
+            pal.accent
+        } else {
+            mix(pal.border, pal.text, 0.1)
+        };
+        p.rect(
+            *pill,
+            CornerRadius::same(10),
+            fill,
+            Stroke::new(if is_sel { 1.6 } else { 1.0 }, border),
+            StrokeKind::Inside,
+        );
         let text_w = pill.width() - 20.0;
-        let title = fit_text(&p, &c.title, FontId::proportional(12.5), if c.enabled { pal.text } else { pal.muted }, text_w);
+        let title = fit_text(
+            &p,
+            &c.title,
+            FontId::proportional(12.5),
+            if c.enabled { pal.text } else { pal.muted },
+            text_w,
+        );
         p.galley(pill.min + vec2(10.0, 6.0), title, pal.text);
-        let detail_col = if c.custom { pal.accent_text() } else { pal.muted };
-        let detail = fit_text(&p, &c.detail, FontId::proportional(11.5), detail_col, text_w);
+        let detail_col = if c.custom {
+            pal.accent_text()
+        } else {
+            pal.muted
+        };
+        let detail = fit_text(
+            &p,
+            &c.detail,
+            FontId::proportional(11.5),
+            detail_col,
+            text_w,
+        );
         p.galley(pill.min + vec2(10.0, 22.0), detail, detail_col);
     }
     out
@@ -152,8 +252,14 @@ mod tests {
     use super::*;
 
     fn valid(ys: &[f32], gap: f32, lo: f32, hi: f32) {
-        assert!(ys.windows(2).all(|w| w[1] - w[0] >= gap - 1e-3), "{ys:?} overlap");
-        assert!(ys.iter().all(|y| *y >= lo - 1e-3 && *y <= hi + 1e-3), "{ys:?} outside {lo}..{hi}");
+        assert!(
+            ys.windows(2).all(|w| w[1] - w[0] >= gap - 1e-3),
+            "{ys:?} overlap"
+        );
+        assert!(
+            ys.iter().all(|y| *y >= lo - 1e-3 && *y <= hi + 1e-3),
+            "{ys:?} outside {lo}..{hi}"
+        );
     }
 
     #[test]

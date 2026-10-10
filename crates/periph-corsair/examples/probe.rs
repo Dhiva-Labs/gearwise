@@ -5,8 +5,8 @@
 //!     cargo run -p periph-corsair --example probe
 
 use periph_core::DeviceManager;
-use periph_hid::HidapiBackend;
 use periph_corsair::CorsairDriver;
+use periph_hid::HidapiBackend;
 
 struct StderrLog;
 

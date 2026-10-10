@@ -12,11 +12,17 @@ pub(crate) enum WinKey {
 }
 
 const fn s(code: u16) -> WinKey {
-    WinKey::Scan { code, extended: false }
+    WinKey::Scan {
+        code,
+        extended: false,
+    }
 }
 
 const fn e(code: u16) -> WinKey {
-    WinKey::Scan { code, extended: true }
+    WinKey::Scan {
+        code,
+        extended: true,
+    }
 }
 
 const VK_PAUSE: u16 = 0x13;
@@ -90,7 +96,9 @@ const MEDIA: &[(u16, u16)] = &[
 ];
 
 pub(crate) fn key(usage: u8) -> Option<WinKey> {
-    KEYS.binary_search_by_key(&usage, |&(u, _)| u).ok().map(|i| KEYS[i].1)
+    KEYS.binary_search_by_key(&usage, |&(u, _)| u)
+        .ok()
+        .map(|i| KEYS[i].1)
 }
 
 pub(crate) fn media(usage: u16) -> Option<u16> {
@@ -109,7 +117,10 @@ mod tests {
     #[test]
     fn every_pickable_key_is_mapped() {
         for &(usage, name) in periph_core::keys::KEYS {
-            assert!(key(usage).is_some(), "{name} (0x{usage:02x}) has no scancode");
+            assert!(
+                key(usage).is_some(),
+                "{name} (0x{usage:02x}) has no scancode"
+            );
         }
     }
 
@@ -143,7 +154,10 @@ mod tests {
     #[test]
     fn every_pickable_media_usage_is_mapped() {
         for &(usage, name) in &periph_core::model::media::ALL {
-            assert!(media(usage).is_some(), "{name} (0x{usage:03x}) has no virtual key");
+            assert!(
+                media(usage).is_some(),
+                "{name} (0x{usage:03x}) has no virtual key"
+            );
         }
         assert_eq!(media(periph_core::model::media::VOLUME_UP), Some(0xaf));
         assert_eq!(media(0xffff), None);

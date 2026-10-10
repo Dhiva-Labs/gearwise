@@ -31,7 +31,10 @@ fn main() -> eframe::Result {
             "--screenshot" => screenshot_dir = args.next().map(PathBuf::from),
             // Hidden: window size for the screenshot tour, e.g. 1080x680.
             "--size" => {
-                let parsed = args.next().and_then(|v| v.split_once('x').and_then(|(w, h)| Some([w.parse().ok()?, h.parse().ok()?])));
+                let parsed = args.next().and_then(|v| {
+                    v.split_once('x')
+                        .and_then(|(w, h)| Some([w.parse().ok()?, h.parse().ok()?]))
+                });
                 shot_size = parsed.unwrap_or(shot_size);
             }
             "--version" | "-V" => {
@@ -45,13 +48,33 @@ fn main() -> eframe::Result {
             _ => {}
         }
     }
-    let size = if screenshot_dir.is_some() { shot_size } else { [1180.0, 780.0] };
+    let size = if screenshot_dir.is_some() {
+        shot_size
+    } else {
+        [1180.0, 780.0]
+    };
     let viewport = egui::ViewportBuilder::default()
         .with_title("Periph Studio")
         .with_icon(icon::window_icon())
         .with_app_id("periph-studio")
         .with_inner_size(size)
         .with_min_inner_size([1080.0, 660.0]);
-    let options = eframe::NativeOptions { viewport, ..Default::default() };
-    eframe::run_native("Periph Studio", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, app::Options { screenshot_dir, library_path: None })))))
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+    eframe::run_native(
+        "Periph Studio",
+        options,
+        Box::new(|cc| {
+            Ok(Box::new(app::App::new(
+                cc,
+                app::Options {
+                    screenshot_dir,
+                    library_path: None,
+                    hardware: true,
+                },
+            )))
+        }),
+    )
 }

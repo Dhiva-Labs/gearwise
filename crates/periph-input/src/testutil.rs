@@ -27,7 +27,10 @@ pub(crate) struct Recorder {
 impl Recorder {
     /// A recorder whose `key_down` of `usage` fails without recording.
     pub(crate) fn failing_on(usage: u8) -> Self {
-        Self { fail_key_down: Some(usage), ..Self::default() }
+        Self {
+            fail_key_down: Some(usage),
+            ..Self::default()
+        }
     }
 
     pub(crate) fn events(&self) -> Vec<Event> {
