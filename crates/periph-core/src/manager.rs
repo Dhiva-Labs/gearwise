@@ -98,8 +98,10 @@ impl DeviceManager {
         });
         self.failed.retain(|p| present.contains(p.as_str()));
 
-        let opened: HashSet<String> = self.entries.iter().filter_map(|e| e.path.clone()).collect();
+        let mut opened: HashSet<String> = self.entries.iter().filter_map(|e| e.path.clone()).collect();
         for iface in &ifaces {
+            // Backends may list one path several times (one per top-level
+            // collection); open each path once.
             if opened.contains(&iface.path) || self.failed.contains(&iface.path) {
                 continue;
             }
@@ -107,11 +109,15 @@ impl DeviceManager {
                 continue;
             };
             match driver.open(iface, self.backend.as_ref()) {
+                // Nothing behind it yet (a receiver whose devices are asleep):
+                // leave it unclaimed so the next scan tries again.
+                Ok(devices) if devices.is_empty() => {}
                 Ok(devices) => {
                     for d in &devices {
                         log::info!("{}: opened {} ({})", driver.name(), d.descriptor().name, iface.path);
                     }
                     report.added.extend(devices.iter().map(|d| d.descriptor().id.clone()));
+                    opened.insert(iface.path.clone());
                     self.entries.push(Entry { path: Some(iface.path.clone()), devices });
                 }
                 Err(e) => {
