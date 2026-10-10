@@ -1689,6 +1689,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "periph-core",
+ "periph-hid",
 ]
 
 [[package]]

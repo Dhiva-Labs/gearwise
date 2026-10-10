@@ -284,7 +284,9 @@ impl Profile {
         (stages, default)
     }
 
-    pub fn set_dpi_stages(&mut self, stages: &[DpiStage], default: u8) -> Result<()> {
+    /// Replace the DPI stages. The profile's default stage is kept (clamped
+    /// to the new stage count); the active stage is a RAM setting.
+    pub fn set_dpi_stages(&mut self, stages: &[DpiStage]) -> Result<()> {
         if stages.is_empty() || stages.len() > DPI_SLOTS {
             return Err(Error::invalid(format!("1–{DPI_SLOTS} DPI stages")));
         }
@@ -292,7 +294,9 @@ impl Profile {
             let v = stages.get(slot).map_or(0, |s| s.x);
             self.0[OFF_DPI + 2 * slot..OFF_DPI + 2 * slot + 2].copy_from_slice(&v.to_le_bytes());
         }
-        self.0[OFF_DEFAULT_DPI] = default.min(stages.len() as u8 - 1);
+        if self.0[OFF_DEFAULT_DPI] as usize >= stages.len() {
+            self.0[OFF_DEFAULT_DPI] = 0;
+        }
         if self.0[OFF_SHIFT_DPI] as usize >= stages.len() {
             self.0[OFF_SHIFT_DPI] = 0;
         }
@@ -357,7 +361,12 @@ impl Profile {
     /// Set an LED slot (and its alternate, as the device shows either).
     pub fn set_led(&mut self, i: usize, block: &[u8; 11]) {
         self.0[OFF_LEDS + 11 * i..OFF_LEDS + 11 * i + 11].copy_from_slice(block);
-        self.0[OFF_ALT_LEDS + 11 * i..OFF_ALT_LEDS + 11 * i + 11].copy_from_slice(block);
+        // Keep the alternate slot in step, unless the device leaves it unused
+        // (all 0xff) — then it stays untouched.
+        let alt = &mut self.0[OFF_ALT_LEDS + 11 * i..OFF_ALT_LEDS + 11 * i + 11];
+        if alt.iter().any(|b| *b != 0xff) {
+            alt.copy_from_slice(block);
+        }
     }
 }
 
@@ -499,14 +508,11 @@ mod tests {
         p.0[OFF_RATE] = 1;
         p.0[OFF_DEFAULT_DPI] = 1;
         p.0[OFF_SHIFT_DPI] = 0;
-        p.set_dpi_stages(
-            &[
-                DpiStage::uniform(400),
-                DpiStage::uniform(800),
-                DpiStage::uniform(1600),
-            ],
-            1,
-        )
+        p.set_dpi_stages(&[
+            DpiStage::uniform(400),
+            DpiStage::uniform(800),
+            DpiStage::uniform(1600),
+        ])
         .unwrap();
         p
     }
@@ -585,11 +591,33 @@ mod tests {
     }
 
     #[test]
-    fn led_sets_both_slots() {
+    fn led_updates_alternate_slot_only_when_used() {
         let mut p = blank();
         let block = [0x01, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0];
         p.set_led(1, &block);
         assert_eq!(p.led(1), &block);
-        assert_eq!(&p.0[OFF_ALT_LEDS + 11..OFF_ALT_LEDS + 22], &block);
+        assert_eq!(
+            &p.0[OFF_ALT_LEDS + 11..OFF_ALT_LEDS + 22],
+            &[0xff; 11],
+            "unused alt slot untouched"
+        );
+        p.0[OFF_ALT_LEDS..OFF_ALT_LEDS + 11].fill(0);
+        p.set_led(0, &block);
+        assert_eq!(&p.0[OFF_ALT_LEDS..OFF_ALT_LEDS + 11], &block);
+    }
+
+    #[test]
+    fn default_stage_is_preserved_and_clamped() {
+        let mut p = blank();
+        p.0[OFF_DEFAULT_DPI] = 2;
+        p.set_dpi_stages(&[
+            DpiStage::uniform(400),
+            DpiStage::uniform(800),
+            DpiStage::uniform(900),
+        ])
+        .unwrap();
+        assert_eq!(p.0[OFF_DEFAULT_DPI], 2);
+        p.set_dpi_stages(&[DpiStage::uniform(400)]).unwrap();
+        assert_eq!(p.0[OFF_DEFAULT_DPI], 0);
     }
 }

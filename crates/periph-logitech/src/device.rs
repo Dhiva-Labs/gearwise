@@ -416,7 +416,7 @@ impl LogiDevice {
             .collect();
         let active = stages[d.active as usize];
         if let Some(o) = self.onboard.as_mut() {
-            o.profile.set_dpi_stages(&stages, d.active)?;
+            o.profile.set_dpi_stages(&stages)?;
             self.mark_dirty();
         }
         // Immediate effect while the profile write is pending.
