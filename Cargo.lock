@@ -47,6 +47,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "periph-input"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "periph-core",
+]
+
+[[package]]
 name = "periph-logitech"
 version = "0.1.0"
 dependencies = [
