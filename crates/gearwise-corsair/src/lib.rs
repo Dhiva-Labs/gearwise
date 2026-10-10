@@ -13,6 +13,7 @@
 //! effects are offered (no background animation thread). Brightness is applied
 //! to the colours before they are sent.
 
+mod art;
 mod bragi;
 mod bragi_dev;
 mod common;

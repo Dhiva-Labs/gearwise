@@ -327,13 +327,17 @@ impl LightingEffect {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LightingZoneCaps {
     pub id: u8,
     /// User-facing name: "Logo", "Primary", "Scroll wheel", "Keys".
     pub name: String,
     pub effects: Vec<EffectKind>,
     pub brightness: bool,
+    /// Keys this zone lights, as ids in the device's layout (see
+    /// [`crate::Capabilities::layout`]). Empty when unknown or not a key zone.
+    #[serde(default)]
+    pub keys: Vec<u16>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

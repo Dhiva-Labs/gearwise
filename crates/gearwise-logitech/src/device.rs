@@ -257,6 +257,7 @@ impl LogiDevice {
                 continue;
             }
             self.caps.lighting.push(LightingZoneCaps {
+                keys: Vec::new(),
                 id: z,
                 name,
                 effects: kinds,

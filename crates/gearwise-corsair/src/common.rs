@@ -88,6 +88,7 @@ pub(crate) fn check_dpi(spec: &DpiSpec, dpi: &DpiState) -> Result<()> {
 /// Lighting zone capabilities: Off and Static, brightness applied by the host.
 pub(crate) fn zone_caps(id: u8, name: &str) -> LightingZoneCaps {
     LightingZoneCaps {
+        keys: Vec::new(),
         id,
         name: name.to_string(),
         effects: vec![EffectKind::Off, EffectKind::Static],

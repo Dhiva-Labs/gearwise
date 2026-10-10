@@ -75,7 +75,7 @@ impl BragiDevice {
         let max = optional(link.get(prop::MAX_POLL_RATE))?
             .filter(|v| (1..=7).contains(v))
             .unwrap_or(4);
-        let caps = Capabilities {
+        let mut caps = Capabilities {
             dpi: spec.dpi.as_ref().map(common::dpi_caps),
             report_rates: RATES_HZ[..max as usize].to_vec(),
             lighting: if spec.keys.is_some() {
@@ -93,6 +93,14 @@ impl BragiDevice {
             angle_snapping: spec.angle_snap,
             ..Default::default()
         };
+        if let Some(art) = crate::art::physical(model.pid) {
+            for (zone, keys) in art.zones {
+                if let Some(z) = caps.lighting.iter_mut().find(|z| z.id == zone) {
+                    z.keys = keys;
+                }
+            }
+            caps.layout = Some(art.layout);
+        }
         let now = Instant::now();
         let mut dev = Self {
             link,

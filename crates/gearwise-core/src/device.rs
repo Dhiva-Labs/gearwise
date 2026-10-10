@@ -44,6 +44,11 @@ pub struct Capabilities {
     pub lighting: Vec<LightingZoneCaps>,
     /// Per-key RGB layout, for keyboards with individually addressable keys.
     pub per_key: Option<KeyboardLayout>,
+    /// Physical layout to draw (macro keys, media keys, ...) when it differs
+    /// from `per_key` or the keyboard has zone lighting only. `None` lets the
+    /// UI fall back to `per_key` or a generic board.
+    #[serde(default)]
+    pub layout: Option<KeyboardLayout>,
     pub buttons: Vec<ButtonCaps>,
     /// Number of onboard (on-device) profile slots; 0 if none.
     pub onboard_profiles: u8,

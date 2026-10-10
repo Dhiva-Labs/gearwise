@@ -1,7 +1,7 @@
 //! [`HidTransport`] over an open hidapi device.
 
-use hidapi::{HidDevice, HidResult};
 use gearwise_core::{HidTransport, Result};
+use hidapi::{HidDevice, HidResult};
 
 use crate::error_map::map_error;
 

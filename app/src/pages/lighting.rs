@@ -183,6 +183,7 @@ fn all_zones(zones: &[LightingZoneCaps]) -> LightingZoneCaps {
             .collect()
     });
     LightingZoneCaps {
+        keys: Vec::new(),
         id: ALL_ZONES,
         name: "All zones".into(),
         effects,

@@ -157,6 +157,7 @@ fn capabilities(spec: &Spec) -> Capabilities {
                     .iter()
                     .zip(0u8..)
                     .map(|(zone, id)| LightingZoneCaps {
+                        keys: Vec::new(),
                         id,
                         name: zone.name.to_owned(),
                         effects: light.effects().to_vec(),

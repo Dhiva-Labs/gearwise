@@ -25,8 +25,8 @@
 //! the next scan, which is cheap and self-healing; missing a real unplug would
 //! leave a dead device in the UI.
 
-use hidapi::HidError;
 use gearwise_core::Error;
+use hidapi::HidError;
 
 /// Coarse outcome of classifying a hidapi error.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

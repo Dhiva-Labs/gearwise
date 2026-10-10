@@ -5,9 +5,9 @@ use std::ffi::{CString, OsString};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use hidapi::{BusType, DeviceInfo, HidApi};
 use gearwise_core::transport::BusKind;
 use gearwise_core::{Error, HidBackend, HidInterfaceInfo, HidTransport, Result};
+use hidapi::{BusType, DeviceInfo, HidApi};
 
 use crate::error_map::map_error;
 use crate::transport::HidapiTransport;

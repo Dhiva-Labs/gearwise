@@ -379,6 +379,7 @@ fn capabilities(model: &Model) -> Capabilities {
             .zones
             .iter()
             .map(|z| LightingZoneCaps {
+                keys: Vec::new(),
                 id: z.led,
                 name: z.name.to_string(),
                 effects: z.effects.to_vec(),

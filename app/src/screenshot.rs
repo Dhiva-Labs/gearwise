@@ -396,6 +396,7 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
     let (d0, c0) = (base.descriptor().clone(), base.capabilities().clone());
     let s0 = base.read_state().unwrap_or_default();
     let zone = |id: u8, name: &str| LightingZoneCaps {
+        keys: Vec::new(),
         id,
         name: name.into(),
         effects: EffectKind::ALL[..5].to_vec(),
@@ -617,6 +618,7 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
             std::iter::once((0, "Win-lock indicator".to_string()))
                 .chain((1..=5).map(|i| (i, format!("Zone {i}"))))
                 .map(|(id, name)| LightingZoneCaps {
+                    keys: Vec::new(),
                     id,
                     name,
                     effects: vec![EffectKind::Off, EffectKind::Static],

@@ -152,6 +152,7 @@ fn button(
 
 fn zone(id: u8, name: &str, effects: &[EffectKind]) -> LightingZoneCaps {
     LightingZoneCaps {
+        keys: Vec::new(),
         id,
         name: name.into(),
         effects: effects.to_vec(),
@@ -166,6 +167,7 @@ fn stages(v: &[u16]) -> Vec<DpiStage> {
 fn logitech_mouse() -> DemoDevice {
     use EffectKind::*;
     let caps = Capabilities {
+        layout: None,
         dpi: Some(DpiCaps {
             min: 100,
             max: 25_600,
@@ -328,6 +330,7 @@ fn razer_keyboard() -> DemoDevice {
         hotspot: None,
     });
     let caps = Capabilities {
+        layout: None,
         dpi: None,
         report_rates: vec![125, 250, 500, 1000, 2000, 4000, 8000],
         lighting: vec![
@@ -391,6 +394,7 @@ fn razer_keyboard() -> DemoDevice {
 fn corsair_mouse() -> DemoDevice {
     use EffectKind::*;
     let caps = Capabilities {
+        layout: None,
         dpi: Some(DpiCaps {
             min: 100,
             max: 26_000,
