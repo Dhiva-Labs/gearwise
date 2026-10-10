@@ -103,6 +103,9 @@ pub fn with_direction(e: LightingEffect, d: WaveDirection) -> LightingEffect {
     }
 }
 
+/// Pseudo zone id for "apply to every zone at once" (never a real zone id).
+pub const ALL_ZONES: u8 = u8::MAX;
+
 pub fn show(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Action>) {
     let zones = &dev.caps.lighting;
     if st.device != dev.desc.id {
@@ -117,7 +120,8 @@ pub fn show(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Ac
             LightMode::Effects
         };
     }
-    if !zones.iter().any(|z| z.id == st.zone) {
+    let all_ok = st.zone == ALL_ZONES && zones.len() > 1;
+    if !all_ok && !zones.iter().any(|z| z.id == st.zone) {
         st.zone = zones.first().map_or(0, |z| z.id);
     }
     let has_effects = !zones.is_empty();
@@ -132,6 +136,9 @@ pub fn show(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Ac
         if has_effects && st.mode == LightMode::Effects && zones.len() > 1 {
             ui.spacing_mut().item_spacing.x = 8.0;
             widgets::muted(ui, "Zone");
+            if widgets::pill(ui, "All zones", st.zone == ALL_ZONES).clicked() {
+                st.zone = ALL_ZONES;
+            }
             for z in zones {
                 if widgets::pill(ui, &z.name, z.id == st.zone).clicked() {
                     st.zone = z.id;
@@ -165,11 +172,46 @@ fn zone_state(dev: &DeviceView, id: u8) -> ZoneState {
     })
 }
 
+/// The effects every zone supports, as a pseudo zone for "All zones".
+fn all_zones(zones: &[LightingZoneCaps]) -> LightingZoneCaps {
+    let effects = zones.first().map_or_else(Vec::new, |first| {
+        first
+            .effects
+            .iter()
+            .copied()
+            .filter(|k| zones.iter().all(|z| z.effects.contains(k)))
+            .collect()
+    });
+    LightingZoneCaps {
+        id: ALL_ZONES,
+        name: "All zones".into(),
+        effects,
+        brightness: zones.iter().all(|z| z.brightness),
+    }
+}
+
 fn effects(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Action>) {
-    let Some(zone) = dev.caps.lighting.iter().find(|z| z.id == st.zone) else {
-        return;
+    let all;
+    let zone = if st.zone == ALL_ZONES {
+        all = all_zones(&dev.caps.lighting);
+        &all
+    } else {
+        match dev.caps.lighting.iter().find(|z| z.id == st.zone) {
+            Some(z) => z,
+            None => return,
+        }
     };
-    let current = zone_state(dev, zone.id);
+    // For "All zones" show the first zone that is lit, else the first zone.
+    let current = if zone.id == ALL_ZONES {
+        dev.caps
+            .lighting
+            .iter()
+            .map(|z| zone_state(dev, z.id))
+            .find(|s| s.effect != LightingEffect::Off)
+            .unwrap_or_else(|| zone_state(dev, dev.caps.lighting[0].id))
+    } else {
+        zone_state(dev, zone.id)
+    };
     if let Some(c) = current.effect.color() {
         st.colors.insert(zone.id, c);
     }
@@ -208,14 +250,26 @@ fn effects(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Act
         );
     }
     if let Some((new, now)) = change {
-        out.push(Action::Apply {
-            dev: dev.desc.id.clone(),
-            setting: Setting::Lighting {
-                zone: zone.id,
-                state: new,
-            },
-            debounce: !now,
-        });
+        let targets: Vec<u8> = if zone.id == ALL_ZONES {
+            dev.caps
+                .lighting
+                .iter()
+                .filter(|z| z.effects.contains(&new.effect.kind()))
+                .map(|z| z.id)
+                .collect()
+        } else {
+            vec![zone.id]
+        };
+        for id in targets {
+            out.push(Action::Apply {
+                dev: dev.desc.id.clone(),
+                setting: Setting::Lighting {
+                    zone: id,
+                    state: new,
+                },
+                debounce: !now,
+            });
+        }
     }
 }
 
@@ -258,11 +312,40 @@ fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, h
         }
     }
     ui.add_space(6.0);
-    let zs = zone_state(dev, selected.id);
-    widgets::caption(
-        ui,
-        format!("{} · {}", selected.name, zs.effect.kind().name()),
-    );
+    if selected.id != ALL_ZONES {
+        let zs = zone_state(dev, selected.id);
+        widgets::caption(
+            ui,
+            format!("{} · {}", selected.name, zs.effect.kind().name()),
+        );
+    }
+}
+
+/// Zones that each light a vertical slice of the keys, left to right
+/// ("Zone 1" … "Zone 5" on boards like the K55).
+fn key_slices(zones: &[LightingZoneCaps]) -> Vec<&LightingZoneCaps> {
+    let slices: Vec<&LightingZoneCaps> = zones
+        .iter()
+        .filter(|z| z.name.to_ascii_lowercase().starts_with("zone "))
+        .collect();
+    if slices.len() >= 2 {
+        slices
+    } else {
+        Vec::new()
+    }
+}
+
+/// Layout to draw when the device doesn't report one.
+fn fallback_layout(name: &str) -> KeyboardLayout {
+    let n = name.to_ascii_lowercase();
+    let compact = ["tkl", "tenkeyless", "mini", "60", "65", "75"]
+        .iter()
+        .any(|w| n.contains(w));
+    if compact {
+        periph_core::keys::ansi_tkl()
+    } else {
+        periph_core::keys::ansi_full()
+    }
 }
 
 fn keyboard_preview(
@@ -273,18 +356,24 @@ fn keyboard_preview(
     t: f32,
     pal: &Palette,
 ) {
-    let default_layout = periph_core::keys::ansi_tkl();
+    let default_layout = fallback_layout(dev.display_name());
     let layout: &KeyboardLayout = dev.caps.per_key.as_ref().unwrap_or(&default_layout);
     let g = illustration::keyboard_geom(area, layout);
     let zones = &dev.caps.lighting;
-    // The zone that colours the keys; any other zone glows around the chassis.
-    let key_zone = zones
-        .iter()
-        .find(|z| z.name.to_ascii_lowercase().contains("key"))
-        .or(zones.first());
+    let slices = key_slices(zones);
+    // The zone that colours the keys (unless slices do); any other zone glows
+    // around the chassis.
+    let key_zone = if slices.is_empty() {
+        zones
+            .iter()
+            .find(|z| z.name.to_ascii_lowercase().contains("key"))
+            .or(zones.first())
+    } else {
+        None
+    };
     for z in zones
         .iter()
-        .filter(|z| Some(z.id) != key_zone.map(|k| k.id))
+        .filter(|z| Some(z.id) != key_zone.map(|k| k.id) && !slices.iter().any(|s| s.id == z.id))
     {
         let zs = zone_state(dev, z.id);
         if zs.effect == LightingEffect::Off {
@@ -309,8 +398,18 @@ fn keyboard_preview(
     illustration::paint_chassis(ui.painter(), &g, pal);
     let width = layout.width().max(1.0);
     let key_state = key_zone.map(|z| zone_state(dev, z.id));
+    let slice_of = |cell: &periph_core::keys::KeyCell| -> Option<&LightingZoneCaps> {
+        let x = (cell.x + cell.w / 2.0) / width;
+        slices
+            .get(((x * slices.len() as f32) as usize).min(slices.len().saturating_sub(1)))
+            .copied()
+    };
     for cell in &layout.keys {
-        let color = key_state.map_or(Color32::BLACK, |zs| {
+        let zs = match slice_of(cell) {
+            Some(z) => Some(zone_state(dev, z.id)),
+            None => key_state,
+        };
+        let color = zs.map_or(Color32::BLACK, |zs| {
             c32(fx::sample(
                 &zs.effect,
                 zs.brightness,
@@ -349,13 +448,31 @@ fn keyboard_preview(
             g.unit,
         );
     }
-    if key_zone.is_some_and(|k| k.id == selected.id) {
+    let whole = selected.id == ALL_ZONES || key_zone.is_some_and(|k| k.id == selected.id);
+    if whole {
         ui.painter().rect_stroke(
             g.chassis.expand(3.0),
             CornerRadius::same((g.unit * 0.4) as u8),
             Stroke::new(1.5, pal.accent),
             StrokeKind::Outside,
         );
+    } else if let Some(i) = slices.iter().position(|z| z.id == selected.id) {
+        // Outline the keys this zone lights.
+        let in_slice: Vec<Rect> = layout
+            .keys
+            .iter()
+            .filter(|c| slice_of(c).is_some_and(|z| z.id == slices[i].id))
+            .map(|c| illustration::key_rect(&g, c))
+            .collect();
+        if let Some(first) = in_slice.first() {
+            let bounds = in_slice.iter().fold(*first, |r, k| r.union(*k));
+            ui.painter().rect_stroke(
+                bounds.expand(3.0),
+                CornerRadius::same((g.unit * 0.25) as u8),
+                Stroke::new(1.5, pal.accent),
+                StrokeKind::Outside,
+            );
+        }
     }
 }
 

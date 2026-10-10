@@ -25,10 +25,13 @@ use std::path::PathBuf;
 fn main() -> eframe::Result {
     let mut args = std::env::args().skip(1);
     let mut screenshot_dir = None;
+    let mut hw_screenshot_dir = None;
     let mut shot_size = [1280.0, 800.0];
     while let Some(a) = args.next() {
         match a.as_str() {
             "--screenshot" => screenshot_dir = args.next().map(PathBuf::from),
+            // Hidden: screenshot the connected hardware (throwaway library).
+            "--hw-screenshot" => hw_screenshot_dir = args.next().map(PathBuf::from),
             // Hidden: window size for the screenshot tour, e.g. 1080x680.
             "--size" => {
                 let parsed = args.next().and_then(|v| {
@@ -48,7 +51,7 @@ fn main() -> eframe::Result {
             _ => {}
         }
     }
-    let size = if screenshot_dir.is_some() {
+    let size = if screenshot_dir.is_some() || hw_screenshot_dir.is_some() {
         shot_size
     } else {
         [1180.0, 780.0]
@@ -71,8 +74,9 @@ fn main() -> eframe::Result {
                 cc,
                 app::Options {
                     screenshot_dir,
-                    library_path: None,
+                    library_path: hw_screenshot_dir.as_ref().map(|d| d.join("library.json")),
                     hardware: true,
+                    hw_screenshot_dir,
                 },
             )))
         }),

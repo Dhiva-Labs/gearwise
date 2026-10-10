@@ -18,7 +18,7 @@ use crate::input::MacroEngine;
 use crate::keymap::{self, KeyEv};
 use crate::pages::{self, PageStates};
 use crate::persist;
-use crate::screenshot::{self, Capture};
+use crate::screenshot::{self, Capture, HwCapture};
 use crate::sidebar::{self, Nav};
 use crate::state::{
     Action, DeviceView, Route, SettingKey, Tab, ToastKind, merge_settings, setting_key,
@@ -38,6 +38,8 @@ pub struct Options {
     pub library_path: Option<PathBuf>,
     /// Talk to real devices (off for tests and the screenshot tour).
     pub hardware: bool,
+    /// Screenshot the connected hardware into this directory and exit.
+    pub hw_screenshot_dir: Option<PathBuf>,
 }
 
 pub struct App {
@@ -60,6 +62,7 @@ pub struct App {
     save_due: Option<Instant>,
     look: (Theme, String),
     pub(crate) capture: Option<Capture>,
+    pub(crate) hw_capture: Option<HwCapture>,
 }
 
 impl App {
@@ -111,6 +114,7 @@ impl App {
             save_due: None,
             look,
             capture: opts.screenshot_dir.map(Capture::new),
+            hw_capture: opts.hw_screenshot_dir.map(HwCapture::new),
         }
     }
 
@@ -700,6 +704,7 @@ impl eframe::App for App {
         self.sync_look(ctx);
         self.autosave(ctx);
         self.drive_capture(ctx);
+        self.drive_hw_capture(ctx);
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {

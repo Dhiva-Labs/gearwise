@@ -26,6 +26,7 @@ const SUPERLIGHT: &str = "logitech:c094";
 const NAGA: &str = "razer:0067";
 const DEATHADDER: &str = "razer:00b6";
 const HEADSET: &str = "corsair:0a64";
+const K55: &str = "corsair:1ba4";
 
 /// Frames to let a view settle (layout height matching, animations) before the shot.
 const SETTLE_FRAMES: u32 = 16;
@@ -106,6 +107,12 @@ fn steps() -> Vec<Step> {
         }),
         dev("16-deathadder-lighting", DEATHADDER, Tab::Lighting, nothing),
         dev("17-headset-lighting", HEADSET, Tab::Lighting, nothing),
+        dev("20-k55-zone-lighting", K55, Tab::Lighting, |a| {
+            a.pages.light.zone = 3
+        }),
+        dev("21-k55-all-zones", K55, Tab::Lighting, |a| {
+            a.pages.light.zone = crate::pages::lighting::ALL_ZONES
+        }),
         dev("18-info-permission-banner", LOGITECH, Tab::Info, |a| {
             a.show_sample_issue();
             a.toasts.push(ToastKind::Success, "Saved to G502 X Plus");
@@ -131,6 +138,7 @@ impl Step {
 /// Profiles and macros so those pages have something to show.
 pub fn sample_library() -> Library {
     let mut lib = Library::starter();
+    lib.prefs.demo_devices = true;
     let mut fps = Profile::new("FPS competitive");
     fps.apps = vec!["valorant.exe".into(), "cs2".into()];
     let mut studio = Profile::new("Creative work");
@@ -601,7 +609,31 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
             vec![],
         ),
         make(
-            "Arctis Nova",
+            "K55 RGB PRO",
+            Vendor::Corsair,
+            DeviceKind::Keyboard,
+            0x1ba4,
+            Vec::new(),
+            std::iter::once((0, "Win-lock indicator".to_string()))
+                .chain((1..=5).map(|i| (i, format!("Zone {i}"))))
+                .map(|(id, name)| LightingZoneCaps {
+                    id,
+                    name,
+                    effects: vec![EffectKind::Off, EffectKind::Static],
+                    brightness: true,
+                })
+                .collect(),
+            vec![
+                (1, lit(Rgb::new(255, 40, 60))),
+                (2, lit(Rgb::new(255, 160, 0))),
+                (3, lit(Rgb::new(0, 212, 170))),
+                (4, lit(Rgb::new(0, 140, 255))),
+                (5, lit(Rgb::new(150, 70, 255))),
+            ],
+            vec![],
+        ),
+        make(
+            "HS80 RGB Wireless",
             Vendor::Corsair,
             DeviceKind::Headset,
             0x0a64,
@@ -611,4 +643,136 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
             vec![],
         ),
     ]
+}
+
+// --- `--hw-screenshot <dir>`: the real devices, as connected ----------------------
+
+/// How long to wait for hardware to show up before giving up.
+const HW_WAIT: Duration = Duration::from_secs(8);
+
+pub struct HwCapture {
+    dir: PathBuf,
+    started: Instant,
+    /// (file name, device id, tab), built once devices have arrived.
+    shots: Vec<(String, String, Tab)>,
+    step: usize,
+    frames: u32,
+    entered: Instant,
+    requested: bool,
+}
+
+impl HwCapture {
+    pub fn new(dir: PathBuf) -> Self {
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            eprintln!("cannot create {}: {e}", dir.display());
+        }
+        Self {
+            dir,
+            started: Instant::now(),
+            shots: Vec::new(),
+            step: 0,
+            frames: 0,
+            entered: Instant::now(),
+            requested: false,
+        }
+    }
+}
+
+impl App {
+    /// Screenshot every connected device's tabs; called every frame from `logic`.
+    pub(crate) fn drive_hw_capture(&mut self, ctx: &Context) {
+        let Some(mut cap) = self.hw_capture.take() else {
+            return;
+        };
+        ctx.request_repaint();
+        if cap.shots.is_empty() {
+            // Give receivers a moment to report every paired device.
+            let settled = cap.started.elapsed() >= Duration::from_secs(3);
+            if settled && !self.devices.is_empty() {
+                cap.shots = self.hw_shot_list();
+                cap.entered = Instant::now();
+                if let Some((_, dev, tab)) = cap.shots.first().cloned() {
+                    self.route = Route::Device;
+                    self.selected = Some(dev);
+                    self.tab = tab;
+                }
+            } else if cap.started.elapsed() >= HW_WAIT {
+                eprintln!("no devices found");
+                ctx.send_viewport_cmd(ViewportCommand::Close);
+            }
+            self.hw_capture = Some(cap);
+            return;
+        }
+        if cap.step >= cap.shots.len() {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+            self.hw_capture = Some(cap);
+            return;
+        }
+        let shot = ctx.input(|i| {
+            i.events.iter().find_map(|e| match e {
+                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                _ => None,
+            })
+        });
+        if let Some(image) = shot {
+            let factor = (image.size[0] as f32 / ctx.content_rect().width())
+                .round()
+                .max(1.0) as usize;
+            let (w, h, rgb) = to_rgb(&image, factor);
+            let path = cap.dir.join(format!("{}.png", cap.shots[cap.step].0));
+            match std::fs::write(&path, png::encode_rgb(w, h, &rgb)) {
+                Ok(()) => println!("wrote {} ({w}x{h})", path.display()),
+                Err(e) => eprintln!("cannot write {}: {e}", path.display()),
+            }
+            cap.step += 1;
+            cap.frames = 0;
+            cap.requested = false;
+            cap.entered = Instant::now();
+            if let Some((_, dev, tab)) = cap.shots.get(cap.step).cloned() {
+                self.selected = Some(dev);
+                self.tab = tab;
+            }
+        } else {
+            cap.frames += 1;
+            if !cap.requested && cap.frames >= SETTLE_FRAMES && cap.entered.elapsed() >= SETTLE_TIME
+            {
+                ctx.send_viewport_cmd(ViewportCommand::Screenshot(Default::default()));
+                cap.requested = true;
+            }
+        }
+        self.hw_capture = Some(cap);
+    }
+
+    fn hw_shot_list(&self) -> Vec<(String, String, Tab)> {
+        let mut out = Vec::new();
+        for (n, d) in self
+            .devices
+            .iter()
+            .filter(|d| !d.desc.simulated)
+            .enumerate()
+        {
+            let slug: String = d
+                .desc
+                .name
+                .to_ascii_lowercase()
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect();
+            let mut tabs = Vec::new();
+            if !d.caps.buttons.is_empty() {
+                tabs.push((Tab::Assignments, "assignments"));
+            }
+            if d.caps.dpi.is_some() {
+                tabs.push((Tab::Sensitivity, "sensitivity"));
+            }
+            if !d.caps.lighting.is_empty() || d.caps.per_key.is_some() {
+                tabs.push((Tab::Lighting, "lighting"));
+            }
+            tabs.push((Tab::Info, "info"));
+            for (tab, name) in tabs {
+                out.push((format!("hw-{n}-{slug}-{name}"), d.desc.id.clone(), tab));
+            }
+        }
+        out
+    }
 }

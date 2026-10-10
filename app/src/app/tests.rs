@@ -17,6 +17,7 @@ fn test_app() -> App {
             screenshot_dir: None,
             library_path: Some(path),
             hardware: false,
+            hw_screenshot_dir: None,
         },
     );
     app.dispatch(Action::SetDemo(true), &ctx);
