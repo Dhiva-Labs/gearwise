@@ -4,7 +4,7 @@ use egui::{
     Align, Align2, CornerRadius, FontId, Layout, Popup, Rect, Response, Sense, Stroke, StrokeKind,
     Ui, pos2, vec2,
 };
-use periph_core::profile::Library;
+use gearwise_core::profile::Library;
 
 use crate::icons::{self, Icon};
 use crate::state::{Action, DeviceView, Route};
@@ -79,7 +79,7 @@ fn wordmark(ui: &mut Ui, pal: &Palette) {
             Stroke::new(1.5, pal.on_accent),
         );
         ui.add_space(2.0);
-        widgets::bold(ui, "Periph Studio", crate::theme::subtitle(), pal.text);
+        widgets::bold(ui, "Gearwise", crate::theme::subtitle(), pal.text);
     });
 }
 
@@ -176,7 +176,7 @@ fn device_card(ui: &mut Ui, d: &DeviceView, selected: bool, pal: &Palette) -> Re
 fn battery_mini(
     p: &egui::Painter,
     right: egui::Pos2,
-    b: &periph_core::model::Battery,
+    b: &gearwise_core::model::Battery,
     pal: &Palette,
 ) -> f32 {
     let pct = b.percent.unwrap_or(0);

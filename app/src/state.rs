@@ -1,6 +1,6 @@
 //! Data shared between the app shell, the sidebar and the pages.
 
-use periph_core::device::{Capabilities, DeviceDescriptor, DeviceState, Setting};
+use gearwise_core::device::{Capabilities, DeviceDescriptor, DeviceState, Setting};
 
 use crate::worker::DeviceSnapshot;
 
@@ -161,14 +161,14 @@ pub fn merge_settings(old: Setting, new: Setting) -> Setting {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use periph_core::model::{ButtonAction, Rgb};
+    use gearwise_core::model::{ButtonAction, Rgb};
 
     #[test]
     fn keys_distinguish_zones_and_buttons() {
         let z = |zone| Setting::Lighting {
             zone,
-            state: periph_core::model::ZoneState {
-                effect: periph_core::model::LightingEffect::Off,
+            state: gearwise_core::model::ZoneState {
+                effect: gearwise_core::model::LightingEffect::Off,
                 brightness: 0,
             },
         };
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn demo_suffix_is_dropped_from_display_names() {
-        let mut d = periph_core::demo::devices().remove(0);
+        let mut d = gearwise_core::demo::devices().remove(0);
         let state = d.read_state().unwrap();
         let v = DeviceView::new(DeviceSnapshot {
             descriptor: d.descriptor().clone(),
@@ -218,13 +218,13 @@ mod tests {
     fn tabs_follow_capabilities() {
         let snap = |caps: Capabilities| {
             DeviceView::new(DeviceSnapshot {
-                descriptor: periph_core::demo::devices()[0].descriptor().clone(),
+                descriptor: gearwise_core::demo::devices()[0].descriptor().clone(),
                 capabilities: caps,
                 state: DeviceState::default(),
             })
         };
         assert_eq!(snap(Capabilities::default()).tabs(), vec![Tab::Info]);
-        let demo = periph_core::demo::devices();
+        let demo = gearwise_core::demo::devices();
         let tabs = |i: usize| snap(demo[i].capabilities().clone()).tabs();
         assert_eq!(
             tabs(0),

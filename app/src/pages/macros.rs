@@ -7,9 +7,9 @@ use egui::{
     Align, CornerRadius, DragValue, Frame, Layout, Margin, Modal, Popup, RichText, ScrollArea,
     Sense, Stroke, StrokeKind, TextEdit, Ui, pos2, vec2,
 };
-use periph_core::device::Setting;
-use periph_core::model::{ButtonAction, MouseButton};
-use periph_core::profile::{Library, Macro, MacroMode, MacroStep};
+use gearwise_core::device::Setting;
+use gearwise_core::model::{ButtonAction, MouseButton};
+use gearwise_core::profile::{Library, Macro, MacroMode, MacroStep};
 
 use crate::icons::{self, Icon};
 use crate::keymap::{Chord, KeyEv};
@@ -452,7 +452,7 @@ fn add_menu(ui: &mut Ui, st: &mut MacrosState, m: &mut Macro) {
 
 /// Row text for a step. The bundled font has no arrow glyphs, so avoid the core labels' arrows.
 pub fn step_text(s: &MacroStep) -> String {
-    let key = |u: &u8| periph_core::keys::name(*u).unwrap_or("?");
+    let key = |u: &u8| gearwise_core::keys::name(*u).unwrap_or("?");
     match s {
         MacroStep::KeyDown(u) => format!("Key down · {}", key(u)),
         MacroStep::KeyUp(u) => format!("Key up · {}", key(u)),
@@ -664,7 +664,7 @@ mod tests {
 
     #[test]
     fn usage_lists_live_buttons_and_profiles() {
-        let mut d = periph_core::demo::devices().remove(0);
+        let mut d = gearwise_core::demo::devices().remove(0);
         let mut state = d.read_state().unwrap();
         state.buttons.insert(0x53, ButtonAction::Macro("m1".into()));
         let view = DeviceView::new(DeviceSnapshot {
@@ -694,7 +694,7 @@ mod tests {
             MacroStep::KeyUp(0x04),
             MacroStep::KeyTap {
                 usage: 0x06,
-                mods: periph_core::model::Modifiers(1),
+                mods: gearwise_core::model::Modifiers(1),
             },
             MacroStep::MouseDown(MouseButton::Left),
             MacroStep::MouseUp(MouseButton::Right),
@@ -705,7 +705,7 @@ mod tests {
         assert_eq!(
             step_text(&MacroStep::KeyTap {
                 usage: 0x06,
-                mods: periph_core::model::Modifiers(1)
+                mods: gearwise_core::model::Modifiers(1)
             }),
             "Tap · Ctrl+C"
         );

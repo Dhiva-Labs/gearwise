@@ -7,7 +7,7 @@ use egui::{
     Align2, Color32, CornerRadius, FontId, Frame, Galley, InnerResponse, Margin, Pos2, Rect,
     Response, RichText, Sense, Stroke, StrokeKind, TextStyle, Ui, Vec2, pos2, vec2,
 };
-use periph_core::model::Battery;
+use gearwise_core::model::Battery;
 
 use crate::icons::{self, Icon};
 use crate::theme::{self, Palette, mix, palette, with_alpha};

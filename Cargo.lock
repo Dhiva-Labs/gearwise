@@ -731,6 +731,90 @@ dependencies = [
 ]
 
 [[package]]
+name = "gearwise"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "gearwise-core",
+ "gearwise-corsair",
+ "gearwise-hid",
+ "gearwise-input",
+ "gearwise-logitech",
+ "gearwise-razer",
+ "gearwise-steelseries",
+ "log",
+ "miniz_oxide 0.8.9",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "gearwise-core"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "gearwise-corsair"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "gearwise-hid",
+ "log",
+]
+
+[[package]]
+name = "gearwise-hid"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "hidapi",
+ "libc",
+ "log",
+]
+
+[[package]]
+name = "gearwise-input"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "libc",
+ "log",
+ "windows-sys 0.61.2",
+ "x11rb 0.14.0",
+]
+
+[[package]]
+name = "gearwise-logitech"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "gearwise-hid",
+ "log",
+]
+
+[[package]]
+name = "gearwise-razer"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "log",
+]
+
+[[package]]
+name = "gearwise-steelseries"
+version = "0.1.0"
+dependencies = [
+ "gearwise-core",
+ "log",
+]
+
+[[package]]
 name = "gethostname"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1643,90 +1727,6 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
-
-[[package]]
-name = "periph-core"
-version = "0.1.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "periph-corsair"
-version = "0.1.0"
-dependencies = [
- "log",
- "periph-core",
- "periph-hid",
-]
-
-[[package]]
-name = "periph-hid"
-version = "0.1.0"
-dependencies = [
- "hidapi",
- "libc",
- "log",
- "periph-core",
-]
-
-[[package]]
-name = "periph-input"
-version = "0.1.0"
-dependencies = [
- "libc",
- "log",
- "periph-core",
- "windows-sys 0.61.2",
- "x11rb 0.14.0",
-]
-
-[[package]]
-name = "periph-logitech"
-version = "0.1.0"
-dependencies = [
- "log",
- "periph-core",
- "periph-hid",
-]
-
-[[package]]
-name = "periph-razer"
-version = "0.1.0"
-dependencies = [
- "log",
- "periph-core",
-]
-
-[[package]]
-name = "periph-steelseries"
-version = "0.1.0"
-dependencies = [
- "log",
- "periph-core",
-]
-
-[[package]]
-name = "periph-studio"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
- "log",
- "miniz_oxide 0.8.9",
- "periph-core",
- "periph-corsair",
- "periph-hid",
- "periph-input",
- "periph-logitech",
- "periph-razer",
- "periph-steelseries",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "pin-project"

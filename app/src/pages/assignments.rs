@@ -4,10 +4,10 @@ use egui::{
     Align, CornerRadius, FontId, Frame, Layout, Margin, Rect, Sense, Stroke, StrokeKind, Ui, pos2,
     vec2,
 };
-use periph_core::device::Setting;
-use periph_core::keys::{self, KeyboardLayout};
-use periph_core::model::{ButtonAction, ButtonCaps, DeviceKind};
-use periph_core::profile::Library;
+use gearwise_core::device::Setting;
+use gearwise_core::keys::{self, KeyboardLayout};
+use gearwise_core::model::{ButtonAction, ButtonCaps, DeviceKind};
+use gearwise_core::profile::Library;
 
 use super::action_label;
 use super::picker::{self, Cat};

@@ -1,14 +1,14 @@
 //! Integration tests for the app shell: the real worker thread with demo devices.
 
 use super::*;
-use periph_core::model::{DpiStage, DpiState, Rgb};
-use periph_core::profile::new_id;
+use gearwise_core::model::{DpiStage, DpiState, Rgb};
+use gearwise_core::profile::new_id;
 
 const LOGITECH: &str = "demo:logitech:c095";
 
 fn test_app() -> App {
     let path = std::env::temp_dir()
-        .join(format!("periph-studio-app-{}", new_id("t")))
+        .join(format!("gearwise-app-{}", new_id("t")))
         .join("library.json");
     let ctx = Context::default();
     let mut app = App::with_context(
@@ -180,7 +180,7 @@ fn edits_follow_the_active_profile_and_profiles_swap_settings() {
         "edits are recorded, one entry per setting"
     );
 
-    let mut other = periph_core::profile::Profile::new("Other");
+    let mut other = gearwise_core::profile::Profile::new("Other");
     other
         .devices
         .insert("logitech:c095".into(), vec![Setting::ReportRate(500)]);

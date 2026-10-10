@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use egui::{Context, ViewportCommand};
-use periph_core::device::{Capabilities, DeviceDescriptor, DeviceState, Setting};
-use periph_core::model::{
+use gearwise_core::device::{Capabilities, DeviceDescriptor, DeviceState, Setting};
+use gearwise_core::model::{
     ButtonAction, ButtonCaps, DeviceKind, DpiFunction, EffectKind, LightingEffect,
     LightingZoneCaps, Modifiers, MouseButton, Rgb, Vendor, WaveDirection, ZoneState, media,
 };
-use periph_core::profile::{Library, Macro, MacroMode, MacroStep, Profile, Theme};
+use gearwise_core::profile::{Library, Macro, MacroMode, MacroStep, Profile, Theme};
 
 use crate::app::App;
 use crate::pages::lighting::LightMode;
@@ -325,7 +325,7 @@ impl App {
     /// A fake "permission denied" scan result, to show the banner.
     fn show_sample_issue(&mut self) {
         self.on_event(crate::worker::Event::ScanIssues(vec![
-            periph_core::ScanIssue {
+            gearwise_core::ScanIssue {
                 path: "/dev/hidraw3".into(),
                 vendor_id: 0x046d,
                 product_id: 0xc547,
@@ -391,7 +391,7 @@ fn mouse_btn(b: MouseButton) -> ButtonAction {
 
 /// Extra simulated devices (never sent to the worker) that show every silhouette.
 pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
-    let mut demo = periph_core::demo::devices();
+    let mut demo = gearwise_core::demo::devices();
     let mut base = demo.remove(0);
     let (d0, c0) = (base.descriptor().clone(), base.capabilities().clone());
     let s0 = base.read_state().unwrap_or_default();

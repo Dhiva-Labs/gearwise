@@ -1,5 +1,5 @@
 [package]
-name = "periph-studio"
+name = "gearwise"
 description = "Lightweight configuration app for Logitech, Razer and Corsair mice and keyboards"
 version.workspace = true
 edition.workspace = true
@@ -7,17 +7,17 @@ license.workspace = true
 rust-version = "1.95"
 
 [[bin]]
-name = "periph-studio"
+name = "gearwise"
 path = "src/main.rs"
 
 [dependencies]
-periph-core.workspace = true
-periph-hid.workspace = true
-periph-input.workspace = true
-periph-logitech.workspace = true
-periph-razer.workspace = true
-periph-corsair.workspace = true
-periph-steelseries.workspace = true
+gearwise-core.workspace = true
+gearwise-hid.workspace = true
+gearwise-input.workspace = true
+gearwise-logitech.workspace = true
+gearwise-razer.workspace = true
+gearwise-corsair.workspace = true
+gearwise-steelseries.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 log.workspace = true

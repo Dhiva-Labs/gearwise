@@ -1,7 +1,7 @@
 //! Info tab: what the device is and what the app can do with it.
 
 use egui::Ui;
-use periph_core::model::ButtonAction;
+use gearwise_core::model::ButtonAction;
 
 use crate::state::DeviceView;
 use crate::widgets;
@@ -127,7 +127,7 @@ mod tests {
     use crate::worker::DeviceSnapshot;
 
     fn view(i: usize) -> DeviceView {
-        let mut d = periph_core::demo::devices().remove(i);
+        let mut d = gearwise_core::demo::devices().remove(i);
         let state = d.read_state().unwrap();
         DeviceView::new(DeviceSnapshot {
             descriptor: d.descriptor().clone(),

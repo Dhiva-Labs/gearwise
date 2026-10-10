@@ -26,7 +26,7 @@ mod tests {
     use super::*;
     use crate::theme::{Palette, apply};
     use egui::{Color32, RawInput, vec2};
-    use periph_core::profile::Theme;
+    use gearwise_core::profile::Theme;
 
     #[test]
     fn hotspots_map_into_the_rect() {

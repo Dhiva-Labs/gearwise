@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install (or remove) the Periph Studio udev rules.
+# Install (or remove) the Gearwise udev rules.
 #
 #   install-udev-rules.sh              install / update, reload udev
 #   install-udev-rules.sh --uninstall  remove the rules, reload udev
@@ -13,13 +13,16 @@
 
 set -eu
 
-RULES_NAME=70-periph-studio.rules
+RULES_NAME=70-gearwise.rules
+# Installed by releases from before the rename to Gearwise.
+LEGACY_NAME=70-periph-studio.rules
 DEST_DIR=${UDEV_RULES_DIR:-/etc/udev/rules.d}
 
 self_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 self=$self_dir/$(basename -- "$0")
 src=$self_dir/$RULES_NAME
 dest=$DEST_DIR/$RULES_NAME
+legacy=$DEST_DIR/$LEGACY_NAME
 
 action=install
 reload=yes
@@ -64,6 +67,11 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # --- Do the work ------------------------------------------------------------
+if [ -e "$legacy" ]; then
+    rm -f -- "$legacy"
+    echo "Removed old rules file $legacy"
+fi
+
 case $action in
     install)
         [ -r "$src" ] || die "cannot read $src"

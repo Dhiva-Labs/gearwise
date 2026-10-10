@@ -27,12 +27,12 @@ jobs:
       - name: Test
         run: cargo test --workspace
       - name: Release build
-        run: cargo build --release -p periph-studio
+        run: cargo build --release -p gearwise
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: periph-studio-${{ matrix.os }}
+          name: gearwise-${{ matrix.os }}
           path: |
-            target/release/periph-studio
-            target/release/periph-studio.exe
+            target/release/gearwise
+            target/release/gearwise.exe
           if-no-files-found: ignore

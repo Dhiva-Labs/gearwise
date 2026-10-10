@@ -2,7 +2,7 @@
 
 use egui::color_picker::{Alpha, color_edit_button_srgba};
 use egui::{FontId, RichText, TextEdit, Ui, vec2};
-use periph_core::profile::{Library, Theme};
+use gearwise_core::profile::{Library, Theme};
 
 use crate::icons::Icon;
 use crate::state::Action;
@@ -147,14 +147,14 @@ pub fn show(ui: &mut Ui, st: &mut SettingsState, lib: &mut Library, out: &mut Ve
         widgets::kv(
             ui,
             "Library file",
-            &periph_core::profile::default_library_path()
+            &gearwise_core::profile::default_library_path()
                 .display()
                 .to_string(),
         );
         ui.add_space(4.0);
         widgets::muted(
             ui,
-            "Periph Studio is an open, lightweight way to configure Logitech, Razer and Corsair mice and keyboards.",
+            "Gearwise is an open, lightweight way to configure Logitech, Razer and Corsair mice and keyboards.",
         );
     });
     ui.add_space(24.0);

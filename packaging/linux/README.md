@@ -2,7 +2,7 @@
 
 ## udev rules
 
-`70-periph-studio.rules` lets the user logged in at the console talk to their
+`70-gearwise.rules` lets the user logged in at the console talk to their
 Logitech (046d), Razer (1532), Corsair (1b1c) and SteelSeries (1038) devices
 without root, and to `/dev/uinput` for macro playback. It works through
 `TAG+="uaccess"`, which gives the active seat's user an ACL on the node; no
@@ -27,5 +27,5 @@ Notes:
   loaded. If the node is still missing, run `sudo modprobe uinput` (add
   `uinput` to `/etc/modules-load.d/` to make it permanent).
 - Debian/RPM packages should ship the file as
-  `/usr/lib/udev/rules.d/70-periph-studio.rules` instead of running the script.
-- Check the syntax with `udevadm verify 70-periph-studio.rules`.
+  `/usr/lib/udev/rules.d/70-gearwise.rules` instead of running the script.
+- Check the syntax with `udevadm verify 70-gearwise.rules`.

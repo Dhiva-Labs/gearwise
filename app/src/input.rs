@@ -5,9 +5,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use periph_core::model::{ButtonAction, Modifiers};
-use periph_core::profile::Macro;
-use periph_input::{MacroPlayer, SharedSink};
+use gearwise_core::model::{ButtonAction, Modifiers};
+use gearwise_core::profile::Macro;
+use gearwise_input::{MacroPlayer, SharedSink};
 
 /// Modifier bits paired with the HID usage of the key that produces them.
 const MOD_KEYS: [(u8, u8); 8] = [
@@ -41,7 +41,7 @@ impl MacroEngine {
         if self.unavailable.is_some() {
             return Err(None);
         }
-        match periph_input::create_sink() {
+        match gearwise_input::create_sink() {
             Ok(b) => {
                 let s: SharedSink = Arc::new(Mutex::new(b));
                 self.player = Some(MacroPlayer::new(s.clone()));
@@ -130,7 +130,7 @@ impl MacroEngine {
     }
 }
 
-fn log_err(r: periph_core::Result<()>) {
+fn log_err(r: gearwise_core::Result<()>) {
     if let Err(e) = r {
         log::warn!("input injection failed: {e}");
     }

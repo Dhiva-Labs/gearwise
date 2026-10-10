@@ -1,8 +1,8 @@
 //! Palette, text styles and the egui visuals that make the app look like itself.
 
 use egui::{Color32, Context, CornerRadius, FontFamily, FontId, Id, Stroke, TextStyle, Vec2};
-use periph_core::model::Vendor;
-use periph_core::profile::Theme;
+use gearwise_core::model::Vendor;
+use gearwise_core::profile::Theme;
 
 pub const ACCENTS: [(&str, &str); 6] = [
     ("Teal", "#00d4aa"),
@@ -303,12 +303,12 @@ pub fn apply(ctx: &Context, pal: &Palette) {
     ctx.set_global_style(style);
 }
 
-pub fn c32(c: periph_core::model::Rgb) -> Color32 {
+pub fn c32(c: gearwise_core::model::Rgb) -> Color32 {
     Color32::from_rgb(c.r, c.g, c.b)
 }
 
-pub fn rgb(c: Color32) -> periph_core::model::Rgb {
-    periph_core::model::Rgb::new(c.r(), c.g(), c.b())
+pub fn rgb(c: Color32) -> gearwise_core::model::Rgb {
+    gearwise_core::model::Rgb::new(c.r(), c.g(), c.b())
 }
 
 #[cfg(test)]

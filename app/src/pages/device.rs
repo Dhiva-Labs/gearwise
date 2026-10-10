@@ -1,7 +1,7 @@
 //! Device page: header, onboard profile slots and the capability-driven tabs.
 
 use egui::{Align, Layout, RichText, ScrollArea, Ui, vec2};
-use periph_core::profile::Library;
+use gearwise_core::profile::Library;
 
 use super::PageStates;
 use crate::icons::{self, Icon};
@@ -9,7 +9,7 @@ use crate::keymap::KeyEv;
 use crate::state::{Action, DeviceView, Tab};
 use crate::theme::{self, palette, vendor_color, with_alpha};
 use crate::widgets::{self, Seg};
-use periph_core::device::Setting;
+use gearwise_core::device::Setting;
 
 pub fn show(
     ui: &mut Ui,

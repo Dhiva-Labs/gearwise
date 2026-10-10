@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use egui::Key;
-use periph_core::model::Modifiers;
+use gearwise_core::model::Modifiers;
 
 /// HID usage (page 0x07) of a physical key, where one exists.
 pub fn hid_usage(key: Key) -> Option<u8> {
@@ -222,7 +222,7 @@ mod tests {
                 && u != 0x64
             {
                 assert!(
-                    periph_core::keys::name(u).is_some(),
+                    gearwise_core::keys::name(u).is_some(),
                     "{key:?} -> 0x{u:02x} has no name"
                 );
             }

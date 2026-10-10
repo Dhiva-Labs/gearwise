@@ -1,4 +1,4 @@
-//! Periph Studio: configure Logitech, Razer and Corsair mice and keyboards.
+//! Gearwise: configure Logitech, Razer and Corsair mice and keyboards.
 
 mod app;
 mod debounce;
@@ -41,11 +41,11 @@ fn main() -> eframe::Result {
                 shot_size = parsed.unwrap_or(shot_size);
             }
             "--version" | "-V" => {
-                println!("periph-studio {}", env!("CARGO_PKG_VERSION"));
+                println!("gearwise {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             "--help" | "-h" => {
-                println!("periph-studio [--version]");
+                println!("gearwise [--version]");
                 return Ok(());
             }
             _ => {}
@@ -57,9 +57,9 @@ fn main() -> eframe::Result {
         [1180.0, 780.0]
     };
     let viewport = egui::ViewportBuilder::default()
-        .with_title("Periph Studio")
+        .with_title("Gearwise")
         .with_icon(icon::window_icon())
-        .with_app_id("periph-studio")
+        .with_app_id("gearwise")
         .with_inner_size(size)
         .with_min_inner_size([1080.0, 660.0]);
     let options = eframe::NativeOptions {
@@ -67,7 +67,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Periph Studio",
+        "Gearwise",
         options,
         Box::new(|cc| {
             Ok(Box::new(app::App::new(

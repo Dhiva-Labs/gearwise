@@ -6,9 +6,9 @@ use egui::color_picker::{Alpha, color_edit_button_srgba};
 use egui::{
     Color32, CornerRadius, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, vec2,
 };
-use periph_core::device::Setting;
-use periph_core::keys::{KeyCell, KeyboardLayout};
-use periph_core::model::Rgb;
+use gearwise_core::device::Setting;
+use gearwise_core::keys::{KeyCell, KeyboardLayout};
+use gearwise_core::model::Rgb;
 
 use super::lighting::text_on;
 use crate::icons::Icon;
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn rainbow_covers_every_key_with_distinct_ends() {
-        let l = periph_core::keys::ansi_tkl();
+        let l = gearwise_core::keys::ansi_tkl();
         let m = rainbow(&l);
         assert_eq!(m.len(), l.keys.len());
         let left = m[&0x35]; // `
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn rectangle_selection_picks_intersecting_keys() {
-        let l = periph_core::keys::ansi_tkl();
+        let l = gearwise_core::keys::ansi_tkl();
         let g = illustration::keyboard_geom(
             Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 300.0)),
             &l,

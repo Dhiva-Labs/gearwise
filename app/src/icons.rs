@@ -4,7 +4,7 @@ use egui::epaint::PathStroke;
 use egui::{
     Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, pos2, vec2,
 };
-use periph_core::model::DeviceKind;
+use gearwise_core::model::DeviceKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Icon {

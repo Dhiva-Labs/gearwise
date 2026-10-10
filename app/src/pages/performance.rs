@@ -1,7 +1,7 @@
 //! Performance tab: polling rate, lift-off distance, angle snapping, game mode.
 
 use egui::{CornerRadius, FontId, Sense, Stroke, StrokeKind, Ui, vec2};
-use periph_core::device::Setting;
+use gearwise_core::device::Setting;
 
 use crate::state::{Action, DeviceView};
 use crate::theme::{mix, palette};

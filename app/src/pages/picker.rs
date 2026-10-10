@@ -4,9 +4,9 @@ use egui::{
     Align, ComboBox, CornerRadius, DragValue, Layout, RichText, ScrollArea, Sense, Stroke,
     StrokeKind, Ui, vec2,
 };
-use periph_core::keys;
-use periph_core::model::{ButtonAction, ButtonCaps, DpiFunction, Modifiers, MouseButton, media};
-use periph_core::profile::Library;
+use gearwise_core::keys;
+use gearwise_core::model::{ButtonAction, ButtonCaps, DpiFunction, Modifiers, MouseButton, media};
+use gearwise_core::profile::Library;
 
 use super::assignments::{AssignState, assign};
 use crate::icons::Icon;

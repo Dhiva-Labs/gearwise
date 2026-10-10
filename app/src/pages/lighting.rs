@@ -8,9 +8,9 @@ use egui::{
     Align, Color32, CornerRadius, FontId, Layout, Rect, Sense, Slider, Stroke, StrokeKind,
     TextEdit, Ui, pos2, vec2,
 };
-use periph_core::device::Setting;
-use periph_core::keys::KeyboardLayout;
-use periph_core::model::{
+use gearwise_core::device::Setting;
+use gearwise_core::keys::KeyboardLayout;
+use gearwise_core::model::{
     DeviceKind, EffectKind, LightingEffect, LightingZoneCaps, Rgb, WaveDirection, ZoneState,
 };
 
@@ -342,9 +342,9 @@ fn fallback_layout(name: &str) -> KeyboardLayout {
         .iter()
         .any(|w| n.contains(w));
     if compact {
-        periph_core::keys::ansi_tkl()
+        gearwise_core::keys::ansi_tkl()
     } else {
-        periph_core::keys::ansi_full()
+        gearwise_core::keys::ansi_full()
     }
 }
 
@@ -398,7 +398,7 @@ fn keyboard_preview(
     illustration::paint_chassis(ui.painter(), &g, pal);
     let width = layout.width().max(1.0);
     let key_state = key_zone.map(|z| zone_state(dev, z.id));
-    let slice_of = |cell: &periph_core::keys::KeyCell| -> Option<&LightingZoneCaps> {
+    let slice_of = |cell: &gearwise_core::keys::KeyCell| -> Option<&LightingZoneCaps> {
         let x = (cell.x + cell.w / 2.0) / width;
         slices
             .get(((x * slices.len() as f32) as usize).min(slices.len().saturating_sub(1)))

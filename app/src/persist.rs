@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use periph_core::profile::Library;
+use gearwise_core::profile::Library;
 
 pub struct Loaded {
     pub lib: Library,
@@ -41,10 +41,10 @@ pub fn load(path: &Path) -> Loaded {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use periph_core::profile::new_id;
+    use gearwise_core::profile::new_id;
 
     fn temp_dir() -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("periph-studio-test-{}", new_id("t")));
+        let dir = std::env::temp_dir().join(format!("gearwise-test-{}", new_id("t")));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

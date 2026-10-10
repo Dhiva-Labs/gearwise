@@ -6,7 +6,7 @@ use egui::{
     Align, CornerRadius, FontId, Layout, Modal, RichText, Sense, Stroke, StrokeKind, TextEdit, Ui,
     pos2, vec2,
 };
-use periph_core::profile::{Library, Profile, new_id};
+use gearwise_core::profile::{Library, Profile, new_id};
 
 use crate::icons::Icon;
 use crate::state::{Action, DeviceView, ToastKind};
@@ -39,7 +39,7 @@ fn default_path(name: &str) -> String {
             }
         })
         .collect();
-    home.join(format!("{file}.periph-profile.json"))
+    home.join(format!("{file}.gearwise-profile.json"))
         .to_string_lossy()
         .into_owned()
 }

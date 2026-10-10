@@ -1,4 +1,4 @@
-# Periph Studio
+# Gearwise
 
 One lightweight app to configure gaming mice and keyboards from **Logitech,
 Razer, Corsair and SteelSeries** on **Linux and Windows** — DPI stages,
@@ -65,9 +65,9 @@ firmware — reports from owners of other devices are very welcome.
 ### Linux
 
 ```bash
-cargo build --release -p periph-studio
+cargo build --release -p gearwise
 sudo packaging/linux/install-udev-rules.sh   # once: lets your user open the devices
-./target/release/periph-studio
+./target/release/gearwise
 ```
 
 The udev rule grants the logged-in user access to these vendors' HID
@@ -77,10 +77,10 @@ OpenRGB use. Replug devices after installing it.
 ### Windows
 
 ```bash
-cargo build --release -p periph-studio
+cargo build --release -p gearwise
 ```
 
-Run `target\release\periph-studio.exe`. Close G HUB / Synapse / iCUE / GG
+Run `target\release\gearwise.exe`. Close G HUB / Synapse / iCUE / GG
 first: they can hold devices exclusively or overwrite settings.
 
 ## How it works
@@ -91,15 +91,15 @@ app (egui UI)  ──commands──▶  worker thread  ──▶  DeviceManager
       └────────events─────────────┘          drivers: logitech · razer
                                               corsair · steelseries
                                                        │
-                                               periph-hid (hidapi)
+                                               gearwise-hid (hidapi)
 ```
 
 | Crate | Purpose |
 |---|---|
-| `periph-core` | Vendor-neutral model: capabilities, state, settings, profiles, macros, device manager, demo devices, mock transport for tests |
-| `periph-hid` | hidapi backend (pure-Rust on both platforms — no libudev or C toolchain needed) |
-| `periph-logitech` / `-razer` / `-corsair` / `-steelseries` | Protocol drivers |
-| `periph-input` | Macro playback (`uinput` / `SendInput`) and focused-application detection |
+| `gearwise-core` | Vendor-neutral model: capabilities, state, settings, profiles, macros, device manager, demo devices, mock transport for tests |
+| `gearwise-hid` | hidapi backend (pure-Rust on both platforms — no libudev or C toolchain needed) |
+| `gearwise-logitech` / `-razer` / `-corsair` / `-steelseries` | Protocol drivers |
+| `gearwise-input` | Macro playback (`uinput` / `SendInput`) and focused-application detection |
 | `app` | The desktop UI |
 
 The UI never blocks on device I/O: changes are applied optimistically and
@@ -111,8 +111,8 @@ after the last change) so dragging a slider never hammers flash.
 ```bash
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p periph-logitech --example probe   # read-only dump of connected Logitech devices
-cargo run -p periph-corsair --example probe
+cargo run -p gearwise-logitech --example probe   # read-only dump of connected Logitech devices
+cargo run -p gearwise-corsair --example probe
 ```
 
 ## License

@@ -14,8 +14,8 @@ pub mod profiles;
 pub mod sensitivity;
 pub mod settings;
 
-use periph_core::model::ButtonAction;
-use periph_core::profile::Library;
+use gearwise_core::model::ButtonAction;
+use gearwise_core::profile::Library;
 
 /// Human label for an action, resolving macro ids to their names.
 pub fn action_label(a: &ButtonAction, lib: &Library) -> String {
@@ -52,7 +52,7 @@ mod tests {
     use crate::state::{Action, DeviceView, Tab};
     use crate::worker::DeviceSnapshot;
     use egui::{Event, PointerButton, Pos2, RawInput, Rect, vec2};
-    use periph_core::profile::Macro;
+    use gearwise_core::profile::Macro;
 
     #[test]
     fn macro_actions_show_the_macro_name() {
@@ -73,7 +73,7 @@ mod tests {
 
     /// The three demo devices plus the extra silhouettes (G502 HERO, slim, MMO, DeathAdder, headset).
     fn demo_views() -> Vec<DeviceView> {
-        let demo = periph_core::demo::devices().into_iter().map(|mut d| {
+        let demo = gearwise_core::demo::devices().into_iter().map(|mut d| {
             let state = d.read_state().unwrap();
             DeviceView::new(DeviceSnapshot {
                 descriptor: d.descriptor().clone(),
@@ -112,7 +112,7 @@ mod tests {
         crate::theme::apply(
             &ctx,
             &crate::theme::Palette::new(
-                periph_core::profile::Theme::Dark,
+                gearwise_core::profile::Theme::Dark,
                 egui::Color32::from_rgb(0, 212, 170),
             ),
         );

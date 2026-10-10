@@ -1,7 +1,7 @@
 //! Colour math for animated lighting previews. The device renders the real
 //! effect; this only approximates it on screen.
 
-use periph_core::model::{LightingEffect, Rgb, WaveDirection};
+use gearwise_core::model::{LightingEffect, Rgb, WaveDirection};
 
 /// Colour an LED at horizontal position `pos` (0 = left, 1 = right) shows at
 /// time `t` seconds. `salt` decorrelates LEDs for the reactive effect.

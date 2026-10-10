@@ -7,10 +7,10 @@ use egui::{
     Align, Color32, Context, CornerRadius, Frame, Layout, Margin, Panel, RichText, ScrollArea,
     Stroke, Ui,
 };
-use periph_core::ScanIssue;
-use periph_core::device::Setting;
-use periph_core::model::{ButtonAction, DpiFunction};
-use periph_core::profile::{Library, Theme, default_library_path, settings_from_state};
+use gearwise_core::ScanIssue;
+use gearwise_core::device::Setting;
+use gearwise_core::model::{ButtonAction, DpiFunction};
+use gearwise_core::profile::{Library, Theme, default_library_path, settings_from_state};
 
 use crate::debounce::Debouncer;
 use crate::icons::Icon;

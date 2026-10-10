@@ -3,7 +3,7 @@
 use egui::{
     Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, vec2,
 };
-use periph_core::keys::{KeyCell, KeyboardLayout};
+use gearwise_core::keys::{KeyCell, KeyboardLayout};
 
 use super::shapes::{rounded_poly, vertical_fan};
 use crate::theme::{Palette, mix, with_alpha};
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn keyboard_fits_inside_available_space() {
-        let layout = periph_core::keys::ansi_full();
+        let layout = gearwise_core::keys::ansi_full();
         let avail = Rect::from_min_size(pos2(10.0, 20.0), vec2(900.0, 400.0));
         let g = keyboard_geom(avail, &layout);
         assert!(avail.contains_rect(g.chassis.shrink(0.5)));
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn tiny_windows_still_get_a_usable_unit() {
-        let layout = periph_core::keys::ansi_tkl();
+        let layout = gearwise_core::keys::ansi_tkl();
         let g = keyboard_geom(Rect::from_min_size(Pos2::ZERO, vec2(50.0, 20.0)), &layout);
         assert_eq!(g.unit, 6.0);
     }

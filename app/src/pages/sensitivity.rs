@@ -4,8 +4,8 @@ use egui::{
     Align, Align2, Color32, CornerRadius, DragValue, FontId, Layout, Sense, Slider, Stroke,
     StrokeKind, Ui, pos2, vec2,
 };
-use periph_core::device::Setting;
-use periph_core::model::{DpiCaps, DpiStage, DpiState};
+use gearwise_core::device::Setting;
+use gearwise_core::model::{DpiCaps, DpiStage, DpiState};
 
 use crate::icons::{self, Icon};
 use crate::state::{Action, DeviceView};

@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use egui::{Color32, Pos2, Rect, pos2, vec2};
-use periph_core::model::{ButtonAction, ButtonCaps, DpiFunction, MouseButton};
+use gearwise_core::model::{ButtonAction, ButtonCaps, DpiFunction, MouseButton};
 
 use super::shapes::{centroid, rot_rrect, rounded_poly};
 
@@ -511,7 +511,7 @@ impl MouseArt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use periph_core::model::ButtonAction;
+    use gearwise_core::model::ButtonAction;
 
     fn caps(id: u16, name: &str, default: ButtonAction) -> ButtonCaps {
         ButtonCaps {

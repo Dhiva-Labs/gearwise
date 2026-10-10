@@ -5,9 +5,9 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use periph_core::device::{Capabilities, DeviceDescriptor, DeviceEvent, DeviceState, Setting};
-use periph_core::model::Battery;
-use periph_core::{DeviceManager, Error, ScanIssue, demo};
+use gearwise_core::device::{Capabilities, DeviceDescriptor, DeviceEvent, DeviceState, Setting};
+use gearwise_core::model::Battery;
+use gearwise_core::{DeviceManager, Error, ScanIssue, demo};
 
 use crate::drivers;
 
@@ -228,7 +228,7 @@ impl Runner {
     fn with_device<R>(
         &mut self,
         id: &str,
-        f: impl FnOnce(&mut Box<dyn periph_core::Device>) -> Result<R, Error>,
+        f: impl FnOnce(&mut Box<dyn gearwise_core::Device>) -> Result<R, Error>,
     ) -> Result<R, Error> {
         match self.mgr.device_mut(id) {
             Some(d) => f(d),
