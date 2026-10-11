@@ -65,6 +65,9 @@ parts:
     source: .
     rust-channel: "1.97.1"
     rust-path: [app]
+    # The plugin installs the pinned channel through rustup.
+    build-snaps:
+      - rustup
     build-packages:
       - pkg-config
   extras:
