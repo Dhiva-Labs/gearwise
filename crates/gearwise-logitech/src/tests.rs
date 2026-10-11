@@ -277,7 +277,9 @@ fn iface(pid: u16, usage: u16) -> HidInterfaceInfo {
 }
 
 fn open(pid: u16, devs: Shared) -> Vec<Box<dyn Device>> {
-    let i = iface(pid, 0x0001);
+    // Linux lists the hidraw node with its first (short) collection's usage;
+    // Windows lists the long collection the driver claims there.
+    let i = iface(pid, if cfg!(windows) { 0x0002 } else { 0x0001 });
     let d2 = devs.clone();
     let backend = MockBackend::new(vec![i.clone()], move |_| {
         Ok(Box::new(transport(d2.clone())))

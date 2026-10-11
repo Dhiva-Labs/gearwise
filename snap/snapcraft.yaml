@@ -1,0 +1,76 @@
+name: gearwise
+title: Gearwise
+version: "0.1.0"
+summary: Configure Logitech, Razer, Corsair and SteelSeries mice and keyboards
+description: |
+  Gearwise is a lightweight native app for gaming mice and keyboards from
+  Logitech, Razer, Corsair and SteelSeries: DPI stages, report rate up to
+  8 kHz, RGB lighting (zones and per-key), button assignments, onboard
+  profiles, macros and per-application profiles. Supported mice are drawn
+  as they look, with every button labelled where it is.
+
+  **One-time setup.** The app talks to the devices' HID interfaces
+  (/dev/hidraw*) and plays macros through /dev/uinput, which needs a udev
+  rule granting your user access and two interface connections:
+
+      sudo cp /snap/gearwise/current/udev/70-gearwise.rules /etc/udev/rules.d/
+      sudo udevadm control --reload-rules && sudo udevadm trigger
+      sudo snap connect gearwise:hidraw-devices gearwise:hidraw
+      sudo snap connect gearwise:uinput
+      sudo snap connect gearwise:hardware-observe
+
+  Then unplug and replug your devices. Close G HUB, Synapse, iCUE or GG if
+  they run in a VM or Wine prefix.
+website: https://github.com/Dhiva-Labs/gearwise
+source-code: https://github.com/Dhiva-Labs/gearwise
+issues: https://github.com/Dhiva-Labs/gearwise/issues
+license: MIT
+icon: snap/gui/gearwise.png
+base: core24
+grade: stable
+confinement: strict
+platforms:
+  amd64:
+
+apps:
+  gearwise:
+    command: bin/gearwise
+    desktop: meta/gui/gearwise.desktop
+    extensions: [gnome]
+    plugs:
+      - hidraw-devices
+      - uinput
+      - hardware-observe
+
+plugs:
+  # Raw access to the mice/keyboards' HID interfaces. Paired with the slot
+  # below; needs a store declaration (see packaging/SNAP.md).
+  hidraw-devices:
+    interface: custom-device
+    custom-device: gearwise-hidraw
+
+slots:
+  hidraw:
+    interface: custom-device
+    custom-device: gearwise-hidraw
+    devices:
+      - /dev/hidraw*
+    udev-tagging:
+      - kernel: hidraw*
+        subsystem: hidraw
+
+parts:
+  gearwise:
+    plugin: rust
+    source: .
+    rust-channel: "1.97.1"
+    rust-path: [app]
+    build-packages:
+      - pkg-config
+  extras:
+    plugin: dump
+    source: packaging/linux
+    organize:
+      70-gearwise.rules: udev/70-gearwise.rules
+    stage:
+      - udev/70-gearwise.rules
