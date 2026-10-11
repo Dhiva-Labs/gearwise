@@ -39,7 +39,6 @@ apps:
     command: bin/gearwise
     # Mesa from the mesa-2404 content snap (gpu-2404 interface).
     command-chain: [bin/gpu-2404-wrapper]
-    desktop: meta/gui/gearwise.desktop
     environment:
       LD_LIBRARY_PATH: $SNAP/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
       XKB_CONFIG_ROOT: $SNAP/usr/share/X11/xkb
