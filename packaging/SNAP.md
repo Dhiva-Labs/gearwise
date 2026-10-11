@@ -56,7 +56,14 @@ snapcraft upload gearwise_0.1.0_amd64.snap
 snapcraft revisions gearwise         # shows the revision waiting for review
 ```
 
-## Store request (post at https://forum.snapcraft.io/c/store-requests/19)
+## Store request
+
+Posted for revision 1 on 2026-10-11 as a comment on the revision's review
+page (dashboard.snapcraft.io → gearwise → Revisions → #1 → "Add feedback for
+this revision"), which reaches the reviewers directly. The same text works
+on the forum (https://forum.snapcraft.io/c/store-requests/19) if they ask for it there.
+
+Text:
 
 Title: **Request: custom-device (hidraw) and uinput for gearwise**
 
