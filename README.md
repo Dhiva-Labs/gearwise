@@ -81,26 +81,44 @@ falls back to a generic silhouette.
 
 ## Install
 
-### Linux
+### Ubuntu (PPA)
 
 ```bash
-cargo build --release -p gearwise
-sudo packaging/linux/install-udev-rules.sh   # once: lets your user open the devices
-./target/release/gearwise
+sudo add-apt-repository ppa:dhiva-labs/apps
+sudo apt install gearwise
 ```
 
-The udev rule grants the logged-in user access to these vendors' HID
-interfaces and to `/dev/uinput` (for macros) — the same model Solaar and
-OpenRGB use. Replug devices after installing it.
+The package installs a udev rule that lets the logged-in user open the
+devices and `/dev/uinput` (for macros) — replug your devices afterwards.
+
+### Debian / Ubuntu (.deb) and other Linux
+
+Download from the [latest release](https://github.com/Dhiva-Labs/gearwise/releases/latest):
+
+* `gearwise_*_amd64.deb` → `sudo apt install ./gearwise_*_amd64.deb`
+* `gearwise-*-linux-x86_64.tar.gz` → extract, run `sudo ./install-udev-rules.sh`
+  once, then `./gearwise`
+
+Linux builds need glibc 2.35+ (Ubuntu 22.04 or newer).
+
+### Snap Store
+
+Submitted; the snap needs a store review for raw HID and uinput access
+before it can be published (see [packaging/SNAP.md](packaging/SNAP.md)).
 
 ### Windows
 
+Download `gearwise-*-windows-x86_64.zip` from the
+[latest release](https://github.com/Dhiva-Labs/gearwise/releases/latest)
+and run `gearwise.exe`. Close G HUB / Synapse / iCUE / GG first: they can
+hold devices exclusively or overwrite settings.
+
+### From source
+
 ```bash
 cargo build --release -p gearwise
+sudo packaging/linux/install-udev-rules.sh   # Linux, once
 ```
-
-Run `target\release\gearwise.exe`. Close G HUB / Synapse / iCUE / GG
-first: they can hold devices exclusively or overwrite settings.
 
 ## How it works
 
