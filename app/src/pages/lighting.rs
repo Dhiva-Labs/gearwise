@@ -16,7 +16,7 @@ use gearwise_core::model::{
 use super::per_key::{self, PerKeyState};
 use crate::fx;
 use crate::illustration::headset::paint_headset;
-use crate::illustration::{self, Kind, MouseArt, MouseLook, ZoneRole, zone_role};
+use crate::illustration::{self, Design, MouseArt, MouseLook, ZoneRole, zone_role};
 use crate::state::{Action, DeviceView};
 use crate::theme::{Palette, c32, mix, palette, rgb, with_alpha};
 use crate::widgets::{self, Seg};
@@ -332,9 +332,9 @@ fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, h
         }
         DeviceKind::Headset => paint_headset(ui.painter(), area.shrink(10.0), &pal, &look),
         _ => {
-            let kind = Kind::for_name(dev.display_name());
-            let rect = illustration::art_rect(area.shrink2(vec2(34.0, 10.0)), kind);
-            MouseArt::new(rect, kind).paint(ui.painter(), &pal, &look, &[]);
+            let design = Design::for_name(dev.display_name());
+            let rect = illustration::art_rect(area.shrink2(vec2(34.0, 10.0)), design);
+            MouseArt::new(rect, design).paint(ui.painter(), &pal, &look, &[]);
         }
     }
     ui.add_space(6.0);

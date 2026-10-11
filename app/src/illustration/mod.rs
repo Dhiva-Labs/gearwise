@@ -1,11 +1,10 @@
-//! Painter-drawn device art: mice, keyboards and headsets, plus the callouts that
-//! tie buttons to the picture.
+//! Painter-drawn device art: mice (model-accurate drawings in `models/`, generic silhouettes
+//! in `mouse`), keyboards and headsets, plus the callouts that tie buttons to the picture.
 
 pub mod callouts;
-mod g502;
-mod g502_shapes;
 pub mod headset;
 pub mod keyboard;
+pub mod models;
 pub mod mouse;
 mod mouse_paint;
 mod roles;
@@ -17,7 +16,7 @@ pub use keyboard::{
     KbGeom, KeyPaint, indicator_dots, key_rect, keyboard_geom, paint_chassis, paint_key,
     paint_zone_outline,
 };
-pub use mouse::{Kind, MouseArt, art_rect};
+pub use mouse::{Design, MouseArt, art_rect};
 pub use roles::{MouseLook, Role, ZoneRole, zone_role};
 
 /// Map a normalised device coordinate (0-1, x left to right, y front to back) onto `rect`.
@@ -30,6 +29,7 @@ pub fn at(rect: Rect, p: (f32, f32)) -> Pos2 {
 
 #[cfg(test)]
 mod tests {
+    use super::mouse::Kind;
     use super::*;
     use crate::theme::{Palette, apply};
     use egui::{Color32, RawInput, vec2};
@@ -39,16 +39,15 @@ mod tests {
     fn hotspots_map_into_the_rect() {
         let r = Rect::from_min_size(pos2(100.0, 50.0), vec2(200.0, 400.0));
         assert_eq!(at(r, (0.5, 0.25)), pos2(200.0, 150.0));
-        let m = art_rect(
-            Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 500.0)),
-            Kind::Ambidextrous,
-        );
+        let design = Design::Generic(Kind::Ambidextrous);
+        let m = art_rect(Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 500.0)), design);
         assert!((m.width() / m.height() - Kind::Ambidextrous.aspect()).abs() < 1e-3);
     }
 
-    /// Paint every silhouette, lit and unlit, tinted and plain, in both themes.
+    /// Paint every generic silhouette and every registered model, lit and unlit, tinted and
+    /// plain, in both themes.
     #[test]
-    fn every_silhouette_paints_in_both_themes() {
+    fn every_design_paints_in_both_themes() {
         let screen = Rect::from_min_size(Pos2::ZERO, vec2(900.0, 700.0));
         for theme in [Theme::Dark, Theme::Light] {
             let ctx = egui::Context::default();
@@ -60,18 +59,21 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    for kind in [
-                        Kind::G502,
+                    let designs = [
                         Kind::Ergonomic,
                         Kind::ErgoLite,
                         Kind::Ambidextrous,
                         Kind::Mmo,
-                    ] {
+                    ]
+                    .map(Design::Generic)
+                    .into_iter()
+                    .chain(models::all().map(Design::Model));
+                    for design in designs {
                         let rect = art_rect(
                             Rect::from_min_size(pos2(20.0, 20.0), vec2(500.0, 440.0)),
-                            kind,
+                            design,
                         );
-                        let art = MouseArt::new(rect, kind);
+                        let art = MouseArt::new(rect, design);
                         let lit = MouseLook {
                             logo: Some(Color32::RED),
                             wheel: Some(Color32::GREEN),

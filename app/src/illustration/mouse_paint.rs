@@ -1,5 +1,6 @@
-//! Painting of the mouse artwork: contact shadow, rim, domed shell, split buttons,
-//! wheel, flank keys, logo LED, lighting glow and hover tint.
+//! Painting of the mouse artwork. A model-accurate design paints itself; the generic
+//! silhouettes get a contact shadow, rim, domed shell, split buttons, wheel, flank keys, logo
+//! LED, lighting glow and hover tint.
 
 use std::f32::consts::PI;
 
@@ -8,7 +9,7 @@ use egui::{
     Align2, Color32, CornerRadius, FontId, Painter, Pos2, Shape, Stroke, StrokeKind, pos2, vec2,
 };
 
-use super::mouse::{Geo, Kind, MouseArt, MouseLook, Role, ZoneRole, seam_t};
+use super::mouse::{Design, Geo, Kind, MouseArt, MouseLook, Role, ZoneRole, seam_t};
 use super::shapes::{
     centroid, convex_hull, glow, glow_line, gradient_fan, rounded_poly, seam, vertical_fan,
 };
@@ -17,11 +18,23 @@ use crate::theme::{Palette, mix, with_alpha};
 impl MouseArt {
     /// Paint the whole mouse. `tint` lists parts to light up (hover / selection).
     pub fn paint(&self, p: &Painter, pal: &Palette, look: &MouseLook, tint: &[(Role, f32)]) {
-        if self.kind == Kind::G502 {
-            return super::g502::paint(self, p, pal, look, tint);
+        match self.design {
+            Design::Model(m) => m.paint(self, p, pal, look, tint),
+            Design::Generic(kind) => self.paint_generic(kind, p, pal, look, tint),
         }
+    }
+
+    fn paint_generic(
+        &self,
+        kind: Kind,
+        p: &Painter,
+        pal: &Palette,
+        look: &MouseLook,
+        tint: &[(Role, f32)],
+    ) {
         let skin = Skin::new(pal);
-        let g = &self.geo;
+        let geo = Geo::new(self.rect, kind.profile());
+        let g = &geo;
         let shape = g.outline();
         let closed = |pts: &[Pos2]| [pts, &pts[..1]].concat();
 
@@ -94,13 +107,13 @@ impl MouseArt {
         );
 
         // Thumb panel or grid backing.
-        if self.kind == Kind::Mmo {
-            let cells: Vec<Pos2> = self
-                .parts
-                .iter()
-                .filter(|c| matches!(c.role, Role::Grid(_)))
-                .flat_map(|c| c.poly.iter().copied())
-                .collect();
+        let cells: Vec<Pos2> = self
+            .parts
+            .iter()
+            .filter(|c| matches!(c.role, Role::Grid(_)))
+            .flat_map(|c| c.poly.iter().copied())
+            .collect();
+        if !cells.is_empty() {
             let mid = centroid(&cells);
             let padded: Vec<Pos2> = cells
                 .iter()

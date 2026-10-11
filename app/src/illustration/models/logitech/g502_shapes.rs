@@ -6,13 +6,16 @@ use std::sync::OnceLock;
 
 use egui::{Pos2, pos2};
 
-use super::shapes::chaikin;
+use crate::illustration::models::kit::P;
+use crate::illustration::shapes::chaikin;
 
-pub type P = (f32, f32);
+/// Top-left corner and size of the shell in the reference photo (px).
+pub const ORIGIN: P = (271.0, 95.0);
+pub const SIZE: P = (353.0, 609.0);
 
-/// Map a point of the 353 x 609 reference box (px) into the 0-1 art box.
+/// Map a point of the reference box (px) into the 0-1 art box.
 pub const fn n(x: f32, y: f32) -> P {
-    ((x - 271.0) / 353.0, (y - 95.0) / 609.0)
+    ((x - ORIGIN.0) / SIZE.0, (y - ORIGIN.1) / SIZE.1)
 }
 
 /// Width divided by height of the shell (the cable sticks out above it).

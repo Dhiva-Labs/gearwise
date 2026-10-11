@@ -1,21 +1,20 @@
-//! Top-down mouse artwork. A silhouette is chosen per device, drawn as a layered
-//! product render (rim, domed shell, split buttons, wheel, flank buttons, logo LED),
-//! and exposes anatomical parts so buttons can be placed by role.
+//! Top-down mouse artwork. A product is drawn either by a model-accurate drawing from the
+//! registry in `models/` or, failing that, by one of the generic silhouettes below (a layered
+//! render: rim, domed shell, split buttons, wheel, flank buttons, logo LED). Either way the
+//! result is a [`MouseArt`]: anatomical parts that buttons are placed on by role.
 
 use std::f32::consts::PI;
 
 use egui::{Pos2, Rect, pos2, vec2};
 use gearwise_core::model::ButtonCaps;
 
-use super::g502_shapes;
-pub use super::roles::{MouseLook, Role, ZoneRole};
+use super::models::{self, ModelArt};
+pub use super::roles::{MouseLook, Role, Side, ZoneRole};
 use super::shapes::{centroid, rot_rrect, rounded_poly};
 
-/// The silhouettes the artwork can draw.
+/// The generic silhouettes, used for mice that have no model-accurate drawing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
-    /// The G502 family: angular faceted shell, split nose, flared thumb rest (`g502.rs`).
-    G502,
     /// Right-handed with a thumb rest and a sniper button (Basilisk, M65, G402...).
     Ergonomic,
     /// Mildly ergonomic (DeathAdder) and the fallback for unknown mice.
@@ -31,9 +30,7 @@ impl Kind {
     pub fn for_name(name: &str) -> Kind {
         let n = name.to_ascii_lowercase();
         let any = |list: &[&str]| list.iter().any(|s| n.contains(s));
-        if n.contains("g502") {
-            Kind::G502
-        } else if any(&["naga", "scimitar", "mmo", "g600", "g604"]) {
+        if any(&["naga", "scimitar", "mmo", "g600", "g604"]) {
             Kind::Mmo
         } else if any(&[
             "basilisk",
@@ -72,7 +69,6 @@ impl Kind {
     /// Width divided by height of the artwork box.
     pub fn aspect(self) -> f32 {
         match self {
-            Kind::G502 => g502_shapes::ASPECT,
             Kind::Ergonomic => 0.66,
             Kind::ErgoLite => 0.62,
             Kind::Ambidextrous => 0.56,
@@ -80,17 +76,9 @@ impl Kind {
         }
     }
 
-    /// How far the artwork reaches above its box (the G502's cable), as a fraction of the height.
-    pub fn overhang(self) -> f32 {
+    pub(super) fn profile(self) -> Profile {
         match self {
-            Kind::G502 => g502_shapes::CABLE,
-            _ => 0.0,
-        }
-    }
-
-    fn profile(self) -> Profile {
-        match self {
-            Kind::G502 | Kind::Ergonomic => Profile {
+            Kind::Ergonomic => Profile {
                 a: 0.46,
                 p: 2.4,
                 k: 1.12,
@@ -237,8 +225,37 @@ impl Geo {
 /// Pieces of the mouse a button can be tied to.
 pub struct Part {
     pub role: Role,
+    /// Outline, for the hover tint.
     pub poly: Vec<Pos2>,
+    /// Where the callout marker sits.
     pub anchor: Pos2,
+    /// Margin this part's label prefers; `None` lets the callouts decide from the role and
+    /// where the anchor is.
+    pub side: Option<Side>,
+}
+
+impl Part {
+    /// A part whose anchor is the centre of its outline.
+    pub fn new(role: Role, poly: Vec<Pos2>) -> Self {
+        let anchor = centroid(&poly);
+        Self {
+            role,
+            poly,
+            anchor,
+            side: None,
+        }
+    }
+
+    pub fn anchored(mut self, anchor: Pos2) -> Self {
+        self.anchor = anchor;
+        self
+    }
+
+    /// Ask for this part's label to go in `side`'s margin.
+    pub fn labelled(mut self, side: Side) -> Self {
+        self.side = Some(side);
+        self
+    }
 }
 
 /// Where a button's callout attaches.
@@ -246,141 +263,85 @@ pub struct Placement {
     pub id: u16,
     pub role: Option<Role>,
     pub anchor: Pos2,
+    /// The part's preferred label side (see [`Part::side`]).
+    pub side: Option<Side>,
+}
+
+/// What a drawing contributes beyond its looks: the hit areas and the places lighting refers to.
+pub struct Anatomy {
+    pub parts: Vec<Part>,
+    /// The scroll wheel (lit by the wheel zone, ringed when that zone is selected).
+    pub wheel: Rect,
+    /// The logo mark: centre and radius.
+    pub logo: (Pos2, f32),
+}
+
+/// What draws a mouse: a model-accurate drawing when one matches the product name, else a
+/// generic silhouette.
+#[derive(Clone, Copy)]
+pub enum Design {
+    Model(&'static dyn ModelArt),
+    Generic(Kind),
+}
+
+impl std::fmt::Debug for Design {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Design::Model(m) => write!(f, "Model({})", m.id()),
+            Design::Generic(k) => write!(f, "Generic({k:?})"),
+        }
+    }
+}
+
+impl Design {
+    pub fn for_name(name: &str) -> Design {
+        models::lookup(name).map_or_else(|| Design::Generic(Kind::for_name(name)), Design::Model)
+    }
+
+    /// Width divided by height of the artwork box.
+    pub fn aspect(self) -> f32 {
+        match self {
+            Design::Model(m) => m.aspect(),
+            Design::Generic(k) => k.aspect(),
+        }
+    }
+
+    /// How far the artwork reaches above its box (a cable), as a fraction of the height.
+    pub fn overhang(self) -> f32 {
+        match self {
+            Design::Model(m) => m.overhang(),
+            Design::Generic(_) => 0.0,
+        }
+    }
 }
 
 pub struct MouseArt {
     pub rect: Rect,
-    pub kind: Kind,
-    pub(super) geo: Geo,
-    pub(super) parts: Vec<Part>,
-    pub(super) wheel: Rect,
-    pub(super) logo: (Pos2, f32),
+    pub design: Design,
+    pub parts: Vec<Part>,
+    pub wheel: Rect,
+    pub logo: (Pos2, f32),
 }
 
-/// Largest rect with the silhouette's proportions that fits in `avail`, leaving room above it
-/// for whatever the artwork draws outside its box (the cable).
-pub fn art_rect(avail: Rect, kind: Kind) -> Rect {
-    let over = kind.overhang();
-    let h = (avail.height() / (1.0 + over)).min(avail.width() / kind.aspect());
-    let size = vec2(h * kind.aspect(), h);
+/// Largest rect with the design's proportions that fits in `avail`, leaving room above it
+/// for whatever the artwork draws outside its box (a cable).
+pub fn art_rect(avail: Rect, design: Design) -> Rect {
+    let (aspect, over) = (design.aspect(), design.overhang());
+    let h = (avail.height() / (1.0 + over)).min(avail.width() / aspect);
+    let size = vec2(h * aspect, h);
     let top = avail.center().y - h * (1.0 + over) / 2.0 + h * over;
     Rect::from_min_size(pos2(avail.center().x - size.x / 2.0, top), size)
 }
 
 impl MouseArt {
-    pub fn new(rect: Rect, kind: Kind) -> Self {
-        let geo = Geo::new(rect, kind.profile());
-        if kind == Kind::G502 {
-            return super::g502::build(rect, geo);
-        }
-        let (w, h) = (rect.width(), rect.height());
-        let mut parts = Vec::new();
-        let mut add = |role, poly: Vec<Pos2>, anchor: Option<Pos2>| {
-            let anchor = anchor.unwrap_or_else(|| centroid(&poly));
-            parts.push(Part { role, poly, anchor });
+    pub fn new(rect: Rect, design: Design) -> Self {
+        let Anatomy { parts, wheel, logo } = match design {
+            Design::Model(m) => m.build(rect),
+            Design::Generic(kind) => generic_anatomy(rect, kind),
         };
-
-        // Primary buttons: front edge of the shell down to a curved rear seam.
-        let gap = 0.014;
-        for (role, lo, hi) in [(Role::Left, 0.0, 0.5 - gap), (Role::Right, 0.5 + gap, 1.0)] {
-            let mut poly: Vec<Pos2> = Geo::depths(14, seam_t(if lo == 0.0 { 0.0 } else { 1.0 }))
-                .map(|t| geo.pt(t, if lo == 0.0 { 0.0 } else { 1.0 }))
-                .collect();
-            let arc: Vec<Pos2> = (0..=12)
-                .map(|i| lo + (hi - lo) * i as f32 / 12.0)
-                .map(|f| geo.pt(seam_t(f), f))
-                .collect();
-            if lo == 0.0 {
-                poly.extend(arc);
-            } else {
-                poly.extend(arc.into_iter().rev());
-            }
-            let inner = if lo == 0.0 { hi } else { lo };
-            poly.push(geo.pt(0.006, inner));
-            let anchor = geo.pt(0.17, if lo == 0.0 { 0.27 } else { 0.73 });
-            add(role, poly, Some(anchor));
-        }
-
-        // Scroll wheel and its tilt halves.
-        let wheel = Rect::from_center_size(geo.pt(0.165, 0.5), vec2(w * 0.095, h * 0.15));
-        let wheel_poly = rounded_poly(wheel, wheel.width() / 2.0, 5);
-        let left_half = Rect::from_min_max(wheel.min, pos2(wheel.center().x, wheel.max.y));
-        let right_half = Rect::from_min_max(pos2(wheel.center().x, wheel.min.y), wheel.max);
-        add(Role::Middle, wheel_poly, Some(wheel.center()));
-        add(
-            Role::TiltLeft,
-            rounded_poly(left_half, 4.0, 3),
-            Some(pos2(wheel.min.x - 1.0, wheel.center().y - h * 0.025)),
-        );
-        add(
-            Role::TiltRight,
-            rounded_poly(right_half, 4.0, 3),
-            Some(pos2(wheel.max.x + 1.0, wheel.center().y + h * 0.025)),
-        );
-
-        // DPI rocker and profile button behind the wheel.
-        let dpi = |t: f32| {
-            rounded_poly(
-                Rect::from_center_size(geo.pt(t, 0.5), vec2(w * 0.085, h * 0.04)),
-                4.0,
-                3,
-            )
-        };
-        let (up, down) = (dpi(0.355), dpi(0.405));
-        let merged = rounded_poly(
-            Rect::from_center_size(geo.pt(0.38, 0.5), vec2(w * 0.085, h * 0.095)),
-            5.0,
-            3,
-        );
-        add(Role::DpiUp, up, None);
-        add(Role::DpiDown, down, None);
-        add(Role::DpiCycle, merged, None);
-        let pc = geo.pt(0.475, 0.5);
-        let circle: Vec<Pos2> = (0..16)
-            .map(|i| {
-                pc + vec2((i as f32 * PI / 8.0).cos(), (i as f32 * PI / 8.0).sin()) * (w * 0.03)
-            })
-            .collect();
-        add(Role::Profile, circle, Some(pc));
-
-        // Flank buttons: tangent to the left edge so they follow the shell's curve.
-        let flank = |t: f32, f: f32, across: f32, along: f32| {
-            let c = geo.pt(t, f);
-            rot_rrect(c, w * across, h * along, geo.flank_angle(t), 4.0)
-        };
-        match kind {
-            Kind::G502 | Kind::Ergonomic => {
-                add(Role::Sniper, flank(0.265, 0.075, 0.085, 0.07), None);
-                add(Role::Back, flank(0.395, 0.085, 0.07, 0.078), None);
-                add(Role::Forward, flank(0.485, 0.09, 0.07, 0.078), None);
-            }
-            Kind::ErgoLite => {
-                add(Role::Back, flank(0.37, 0.08, 0.065, 0.075), None);
-                add(Role::Forward, flank(0.455, 0.08, 0.065, 0.075), None);
-            }
-            Kind::Ambidextrous => {
-                add(Role::Back, flank(0.35, 0.075, 0.06, 0.07), None);
-                add(Role::Forward, flank(0.43, 0.075, 0.06, 0.07), None);
-            }
-            Kind::Mmo => {
-                add(Role::Back, flank(0.25, 0.075, 0.06, 0.05), None);
-                add(Role::Forward, flank(0.31, 0.08, 0.06, 0.05), None);
-                for i in 0..12u8 {
-                    let (row, col) = (f32::from(i / 3), f32::from(i % 3));
-                    add(
-                        Role::Grid(i),
-                        flank(0.385 + row * 0.082, 0.065 + col * 0.075, 0.052, 0.054),
-                        None,
-                    );
-                }
-            }
-        }
-
-        let logo = (geo.pt(0.70, 0.5), w * 0.07);
         Self {
             rect,
-            kind,
-            geo,
+            design,
             parts,
             wheel,
             logo,
@@ -391,41 +352,167 @@ impl MouseArt {
         self.parts.iter().find(|p| p.role == role)
     }
 
-    /// Tie each button to a part by role, else to its driver hotspot; MMO grids
-    /// take the remaining buttons in order. Buttons that fit nowhere are omitted.
+    /// Tie each button to a part by role, else to its driver hotspot; buttons with neither
+    /// take the free cells of a thumb grid in order, if the drawing has one. Buttons that fit
+    /// nowhere are omitted.
     pub fn place(&self, buttons: &[ButtonCaps]) -> Vec<Placement> {
+        // Roles first, so a button named after a grid cell keeps it.
         let mut taken: Vec<Role> = Vec::new();
-        let mut out = Vec::new();
-        let mut next_cell = 0u8;
-        for b in buttons {
-            let role = Role::of(b).filter(|r| self.part(*r).is_some() && !taken.contains(r));
-            let role = role.or_else(|| {
-                if self.kind == Kind::Mmo && b.hotspot.is_none() && next_cell < 12 {
-                    next_cell += 1;
-                    Some(Role::Grid(next_cell - 1))
-                } else {
-                    None
-                }
-            });
-            match (role, b.hotspot) {
+        let mut roles: Vec<Option<Role>> = buttons
+            .iter()
+            .map(|b| {
+                let role = Role::of(b).filter(|r| self.part(*r).is_some() && !taken.contains(r))?;
+                taken.push(role);
+                Some(role)
+            })
+            .collect();
+        let cells = self
+            .parts
+            .iter()
+            .filter(|p| matches!(p.role, Role::Grid(_)))
+            .count() as u8;
+        let mut free = (0..cells).map(Role::Grid).filter(|r| !taken.contains(r));
+        for (role, b) in roles.iter_mut().zip(buttons) {
+            if role.is_none() && b.hotspot.is_none() {
+                *role = free.next();
+            }
+        }
+        buttons
+            .iter()
+            .zip(roles)
+            .filter_map(|(b, role)| match (role, b.hotspot) {
                 (Some(r), _) => {
-                    taken.push(r);
-                    let anchor = self.part(r).map_or(self.rect.center(), |p| p.anchor);
-                    out.push(Placement {
+                    let part = self.part(r);
+                    Some(Placement {
                         id: b.id,
-                        role: Some(r),
-                        anchor,
-                    });
+                        role,
+                        anchor: part.map_or(self.rect.center(), |p| p.anchor),
+                        side: part.and_then(|p| p.side),
+                    })
                 }
-                (None, Some(h)) => out.push(Placement {
+                (None, Some(h)) => Some(Placement {
                     id: b.id,
                     role: None,
                     anchor: super::at(self.rect, h),
+                    side: None,
                 }),
-                (None, None) => {}
+                (None, None) => None,
+            })
+            .collect()
+    }
+}
+
+/// Parts of a generic silhouette in `rect`.
+fn generic_anatomy(rect: Rect, kind: Kind) -> Anatomy {
+    let geo = Geo::new(rect, kind.profile());
+    let (w, h) = (rect.width(), rect.height());
+    let mut parts = Vec::new();
+    let mut add = |role, poly: Vec<Pos2>, anchor: Option<Pos2>| {
+        let mut part = Part::new(role, poly);
+        if let Some(a) = anchor {
+            part = part.anchored(a);
+        }
+        parts.push(part);
+    };
+
+    // Primary buttons: front edge of the shell down to a curved rear seam.
+    let gap = 0.014;
+    for (role, lo, hi) in [(Role::Left, 0.0, 0.5 - gap), (Role::Right, 0.5 + gap, 1.0)] {
+        let mut poly: Vec<Pos2> = Geo::depths(14, seam_t(if lo == 0.0 { 0.0 } else { 1.0 }))
+            .map(|t| geo.pt(t, if lo == 0.0 { 0.0 } else { 1.0 }))
+            .collect();
+        let arc: Vec<Pos2> = (0..=12)
+            .map(|i| lo + (hi - lo) * i as f32 / 12.0)
+            .map(|f| geo.pt(seam_t(f), f))
+            .collect();
+        if lo == 0.0 {
+            poly.extend(arc);
+        } else {
+            poly.extend(arc.into_iter().rev());
+        }
+        let inner = if lo == 0.0 { hi } else { lo };
+        poly.push(geo.pt(0.006, inner));
+        let anchor = geo.pt(0.17, if lo == 0.0 { 0.27 } else { 0.73 });
+        add(role, poly, Some(anchor));
+    }
+
+    // Scroll wheel and its tilt halves.
+    let wheel = Rect::from_center_size(geo.pt(0.165, 0.5), vec2(w * 0.095, h * 0.15));
+    let wheel_poly = rounded_poly(wheel, wheel.width() / 2.0, 5);
+    let left_half = Rect::from_min_max(wheel.min, pos2(wheel.center().x, wheel.max.y));
+    let right_half = Rect::from_min_max(pos2(wheel.center().x, wheel.min.y), wheel.max);
+    add(Role::Middle, wheel_poly, Some(wheel.center()));
+    add(
+        Role::TiltLeft,
+        rounded_poly(left_half, 4.0, 3),
+        Some(pos2(wheel.min.x - 1.0, wheel.center().y - h * 0.025)),
+    );
+    add(
+        Role::TiltRight,
+        rounded_poly(right_half, 4.0, 3),
+        Some(pos2(wheel.max.x + 1.0, wheel.center().y + h * 0.025)),
+    );
+
+    // DPI rocker and profile button behind the wheel.
+    let dpi = |t: f32| {
+        rounded_poly(
+            Rect::from_center_size(geo.pt(t, 0.5), vec2(w * 0.085, h * 0.04)),
+            4.0,
+            3,
+        )
+    };
+    let (up, down) = (dpi(0.355), dpi(0.405));
+    let merged = rounded_poly(
+        Rect::from_center_size(geo.pt(0.38, 0.5), vec2(w * 0.085, h * 0.095)),
+        5.0,
+        3,
+    );
+    add(Role::DpiUp, up, None);
+    add(Role::DpiDown, down, None);
+    add(Role::DpiCycle, merged, None);
+    let pc = geo.pt(0.475, 0.5);
+    let circle: Vec<Pos2> = (0..16)
+        .map(|i| pc + vec2((i as f32 * PI / 8.0).cos(), (i as f32 * PI / 8.0).sin()) * (w * 0.03))
+        .collect();
+    add(Role::Profile, circle, Some(pc));
+
+    // Flank buttons: tangent to the left edge so they follow the shell's curve.
+    let flank = |t: f32, f: f32, across: f32, along: f32| {
+        let c = geo.pt(t, f);
+        rot_rrect(c, w * across, h * along, geo.flank_angle(t), 4.0)
+    };
+    match kind {
+        Kind::Ergonomic => {
+            add(Role::Sniper, flank(0.265, 0.075, 0.085, 0.07), None);
+            add(Role::Back, flank(0.395, 0.085, 0.07, 0.078), None);
+            add(Role::Forward, flank(0.485, 0.09, 0.07, 0.078), None);
+        }
+        Kind::ErgoLite => {
+            add(Role::Back, flank(0.37, 0.08, 0.065, 0.075), None);
+            add(Role::Forward, flank(0.455, 0.08, 0.065, 0.075), None);
+        }
+        Kind::Ambidextrous => {
+            add(Role::Back, flank(0.35, 0.075, 0.06, 0.07), None);
+            add(Role::Forward, flank(0.43, 0.075, 0.06, 0.07), None);
+        }
+        Kind::Mmo => {
+            add(Role::Back, flank(0.25, 0.075, 0.06, 0.05), None);
+            add(Role::Forward, flank(0.31, 0.08, 0.06, 0.05), None);
+            for i in 0..12u8 {
+                let (row, col) = (f32::from(i / 3), f32::from(i % 3));
+                add(
+                    Role::Grid(i),
+                    flank(0.385 + row * 0.082, 0.065 + col * 0.075, 0.052, 0.054),
+                    None,
+                );
             }
         }
-        out
+    }
+
+    Anatomy {
+        parts,
+        wheel,
+        logo: (geo.pt(0.70, 0.5), w * 0.07),
     }
 }
 

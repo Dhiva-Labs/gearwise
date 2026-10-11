@@ -13,7 +13,7 @@ use super::picker::{self, Cat};
 use crate::icons::{self, Icon};
 use crate::illustration::callouts::{self, Callout};
 use crate::illustration::headset::paint_headset;
-use crate::illustration::{self, KeyPaint, Kind, MouseArt, MouseLook};
+use crate::illustration::{self, Design, KeyPaint, MouseArt, MouseLook};
 use crate::keymap::{Chord, KeyEv};
 use crate::state::{Action, DeviceView};
 use crate::theme::{Palette, mix, palette, with_alpha};
@@ -149,7 +149,7 @@ fn callout_items(
             Some(Callout {
                 id: b.id,
                 anchor: pl.anchor,
-                side: callouts::side_for(pl.role, pl.anchor, art.rect),
+                side: callouts::side_for(pl.side, pl.role, pl.anchor, art.rect),
                 title: b.name.clone(),
                 detail: if !b.remappable {
                     "Fixed".to_string()
@@ -173,12 +173,12 @@ const MIN_ART_W: f32 = 150.0;
 
 fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library) {
     let pal = palette(ui.ctx());
-    let kind = Kind::for_name(dev.display_name());
+    let design = Design::for_name(dev.display_name());
 
     // Which labels go where does not depend on the size, so measure them on a probe first.
     let probe = MouseArt::new(
-        illustration::art_rect(Rect::from_min_size(Pos2::ZERO, vec2(200.0, 400.0)), kind),
-        kind,
+        illustration::art_rect(Rect::from_min_size(Pos2::ZERO, vec2(200.0, 400.0)), design),
+        design,
     );
     let probe_items = callout_items(&probe, &probe.place(&dev.caps.buttons), dev, lib);
     let per_side = |side| {
@@ -204,13 +204,13 @@ fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library)
         area.min,
         vec2((area.width() - lead - lw - rw).max(100.0), area.height()),
     );
-    let mut rect = illustration::art_rect(free.shrink2(vec2(0.0, 6.0)), kind);
+    let mut rect = illustration::art_rect(free.shrink2(vec2(0.0, 6.0)), design);
     // Centre label columns and art as one group.
     let group = lw + callouts::LEAD + rect.width() + callouts::LEAD + rw;
     let left = area.min.x + (area.width() - group).max(0.0) / 2.0 + lw + callouts::LEAD;
     rect = rect.translate(vec2(left - rect.min.x, 0.0));
 
-    let art = MouseArt::new(rect, kind);
+    let art = MouseArt::new(rect, design);
     let placed = art.place(&dev.caps.buttons);
     let tint: Vec<_> = placed
         .iter()

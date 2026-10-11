@@ -11,10 +11,35 @@ fn caps(id: u16, name: &str, default: ButtonAction) -> ButtonCaps {
     }
 }
 
+fn model_id(name: &str) -> Option<&'static str> {
+    match Design::for_name(name) {
+        Design::Model(m) => Some(m.id()),
+        Design::Generic(_) => None,
+    }
+}
+
+#[test]
+fn registered_models_take_precedence_over_the_generic_silhouettes() {
+    assert_eq!(model_id("G502 X Plus (demo)"), Some("g502"));
+    assert_eq!(model_id("G502 HERO Gaming Mouse"), Some("g502"));
+    assert_eq!(model_id("MX Master 3S"), Some("mx-master"));
+    assert_eq!(model_id("Corsair M65 RGB Ultra"), None);
+    assert!(matches!(
+        Design::for_name("Some Unknown Mouse"),
+        Design::Generic(Kind::ErgoLite)
+    ));
+    // Art boxes follow the model's proportions and leave room for its cable.
+    let g502 = Design::for_name("G502 HERO Gaming Mouse");
+    let rect = art_rect(
+        Rect::from_min_size(pos2(0.0, 0.0), vec2(600.0, 600.0)),
+        g502,
+    );
+    assert!((rect.width() / rect.height() - g502.aspect()).abs() < 1e-3);
+    assert!(rect.min.y > 0.0 && g502.overhang() > 0.0);
+}
+
 #[test]
 fn silhouettes_follow_the_product_name() {
-    assert_eq!(Kind::for_name("G502 X Plus (demo)"), Kind::G502);
-    assert_eq!(Kind::for_name("G502 HERO Gaming Mouse"), Kind::G502);
     assert_eq!(Kind::for_name("Corsair M65 RGB Ultra"), Kind::Ergonomic);
     assert_eq!(Kind::for_name("Razer Basilisk V3"), Kind::Ergonomic);
     assert_eq!(Kind::for_name("Corsair Dark Core RGB"), Kind::Ergonomic);
@@ -57,13 +82,16 @@ fn g502_hero() -> Vec<ButtonCaps> {
 
 #[test]
 fn every_g502_hero_button_gets_an_anatomical_anchor() {
-    for kind in [Kind::G502, Kind::Ergonomic] {
+    for design in [
+        Design::for_name("G502 HERO Gaming Mouse"),
+        Design::Generic(Kind::Ergonomic),
+    ] {
         let art = MouseArt::new(
-            Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 300.0 / kind.aspect())),
-            kind,
+            Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 300.0 / design.aspect())),
+            design,
         );
         let placed = art.place(&g502_hero());
-        assert_eq!(placed.len(), 11, "{kind:?}");
+        assert_eq!(placed.len(), 11, "{design:?}");
         assert!(
             placed.iter().all(|p| p.role.is_some()),
             "roles beat raw hotspots"
@@ -80,52 +108,13 @@ fn every_g502_hero_button_gets_an_anatomical_anchor() {
     }
 }
 
-/// The real G502 layout: G7/G8 left of the left button, the wheel tilts either side of
-/// the wheel, the profile key behind it and the thumb buttons on the left edge.
-#[test]
-fn g502_parts_sit_where_the_real_buttons_are() {
-    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(290.0, 290.0 / Kind::G502.aspect()));
-    let art = MouseArt::new(rect, Kind::G502);
-    let placed = art.place(&g502_hero());
-    let at = |r: Role| art.part(r).unwrap().anchor;
-    assert_eq!(placed.len(), 11);
-    let cx = rect.center().x;
-    for r in [Role::DpiUp, Role::DpiDown, Role::Left] {
-        assert!(at(r).x < cx, "{r:?} is left of the wheel");
-    }
-    assert!(
-        at(Role::DpiUp).y < at(Role::DpiDown).y,
-        "G8 is in front of G7"
-    );
-    assert!(
-        at(Role::DpiUp).x < at(Role::Left).x,
-        "G7/G8 are left of the left button"
-    );
-    assert!(at(Role::TiltLeft).x < art.wheel.center().x);
-    assert!(at(Role::TiltRight).x > art.wheel.center().x);
-    assert!(
-        at(Role::Profile).y > art.wheel.max.y,
-        "G9 is behind the wheel"
-    );
-    assert!(at(Role::DpiCycle).y < at(Role::Profile).y);
-    assert!(
-        at(Role::Forward).y < at(Role::Back).y,
-        "G5 sits in front of G4"
-    );
-    assert!(at(Role::Sniper).y < at(Role::Forward).y);
-    assert!(
-        art.logo.0.y > at(Role::Profile).y,
-        "the logo is on the palm"
-    );
-}
-
 #[test]
 fn buttons_without_a_matching_part_fall_back_to_hotspots_or_the_grid() {
     let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 430.0));
     // Sniper has no part on an ambidextrous mouse, so its hotspot is used.
     let mut sniper = caps(1, "Sniper", ButtonAction::Dpi(DpiFunction::Shift(400)));
     sniper.hotspot = Some((0.1, 0.3));
-    let placed = MouseArt::new(rect, Kind::Ambidextrous).place(&[sniper.clone()]);
+    let placed = MouseArt::new(rect, Design::Generic(Kind::Ambidextrous)).place(&[sniper.clone()]);
     assert_eq!(
         (placed[0].role, placed[0].anchor),
         (None, pos2(30.0, 129.0))
@@ -133,7 +122,7 @@ fn buttons_without_a_matching_part_fall_back_to_hotspots_or_the_grid() {
     // Without a hotspot it is left out of the callouts.
     sniper.hotspot = None;
     assert!(
-        MouseArt::new(rect, Kind::Ambidextrous)
+        MouseArt::new(rect, Design::Generic(Kind::Ambidextrous))
             .place(&[sniper])
             .is_empty()
     );
@@ -141,10 +130,39 @@ fn buttons_without_a_matching_part_fall_back_to_hotspots_or_the_grid() {
     let unknown: Vec<ButtonCaps> = (0..14)
         .map(|i| caps(i, &format!("Button {i}"), ButtonAction::Default))
         .collect();
-    let placed = MouseArt::new(rect, Kind::Mmo).place(&unknown);
+    let placed = MouseArt::new(rect, Design::Generic(Kind::Mmo)).place(&unknown);
     assert_eq!(placed.len(), 12);
     assert_eq!(placed[0].role, Some(Role::Grid(0)));
     assert_eq!(placed[11].role, Some(Role::Grid(11)));
+}
+
+/// Buttons named after a grid cell take that cell; the rest fill the free ones in order.
+#[test]
+fn named_grid_buttons_keep_their_cell() {
+    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 430.0));
+    let buttons = vec![
+        caps(1, "Side button 3", ButtonAction::Default),
+        caps(2, "Mystery", ButtonAction::Default),
+        caps(3, "Side button 1", ButtonAction::Default),
+        caps(4, "Another mystery", ButtonAction::Default),
+    ];
+    let placed = MouseArt::new(rect, Design::Generic(Kind::Mmo)).place(&buttons);
+    let role = |id| placed.iter().find(|p| p.id == id).unwrap().role;
+    assert_eq!(role(1), Some(Role::Grid(2)));
+    assert_eq!(role(3), Some(Role::Grid(0)));
+    assert_eq!(role(2), Some(Role::Grid(1)), "first free cell");
+    assert_eq!(role(4), Some(Role::Grid(3)), "cell 2 is taken");
+}
+
+/// Mice without a grid never invent grid cells for unknown buttons.
+#[test]
+fn unknown_buttons_stay_out_without_a_grid() {
+    let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 430.0));
+    let unknown = vec![caps(1, "Button 9", ButtonAction::Default)];
+    for kind in [Kind::Ergonomic, Kind::ErgoLite, Kind::Ambidextrous] {
+        let art = MouseArt::new(rect, Design::Generic(kind));
+        assert!(art.place(&unknown).is_empty());
+    }
 }
 
 #[test]
@@ -158,20 +176,24 @@ fn each_role_is_used_once() {
             ButtonAction::Mouse(MouseButton::Left),
         ),
     ];
-    assert_eq!(MouseArt::new(rect, Kind::ErgoLite).place(&twice).len(), 1);
+    assert_eq!(
+        MouseArt::new(rect, Design::Generic(Kind::ErgoLite))
+            .place(&twice)
+            .len(),
+        1
+    );
 }
 
 #[test]
-fn parts_stay_inside_the_shell_box() {
+fn generic_parts_stay_inside_the_shell_box() {
     for kind in [
-        Kind::G502,
         Kind::Ergonomic,
         Kind::ErgoLite,
         Kind::Ambidextrous,
         Kind::Mmo,
     ] {
         let rect = Rect::from_min_size(pos2(50.0, 40.0), vec2(300.0 * kind.aspect() / 0.66, 455.0));
-        let art = MouseArt::new(rect, kind);
+        let art = MouseArt::new(rect, Design::Generic(kind));
         for part in &art.parts {
             assert!(
                 part.poly.iter().all(|q| rect.expand(3.0).contains(*q)),
@@ -179,7 +201,7 @@ fn parts_stay_inside_the_shell_box() {
                 part.role
             );
         }
-        let outline = art.geo.outline();
+        let outline = Geo::new(rect, kind.profile()).outline();
         let (min, max) = outline
             .iter()
             .fold((f32::MAX, f32::MIN), |(a, b), q| (a.min(q.x), b.max(q.x)));

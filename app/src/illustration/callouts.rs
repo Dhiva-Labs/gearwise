@@ -7,6 +7,7 @@ use egui::{
 };
 
 use super::roles::Role;
+pub use super::roles::Side;
 use crate::theme::{Palette, mix, with_alpha};
 use crate::widgets::fit_text;
 
@@ -18,12 +19,6 @@ pub const LEAD: f32 = 30.0;
 const MIN_PILL_W: f32 = 104.0;
 /// Radius around a marker that other leader lines keep clear of.
 const CLEAR: f32 = 6.5;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Side {
-    Left,
-    Right,
-}
 
 pub struct Callout {
     pub id: u16,
@@ -45,31 +40,38 @@ pub struct Interaction {
     pub clicked: Option<u16>,
 }
 
-/// Which margin a button's label goes in, given the art's `rect`.
-pub fn side_for(role: Option<Role>, anchor: Pos2, art: Rect) -> Side {
+/// Which margin a button's label goes in, given the art's `rect`. A part's own preference
+/// (`hint`, set by the model) wins; otherwise the role decides, and roles that can sit on
+/// either side go where their anchor is.
+pub fn side_for(hint: Option<Side>, role: Option<Role>, anchor: Pos2, art: Rect) -> Side {
+    if let Some(side) = hint {
+        return side;
+    }
     let centre_x = art.center().x;
+    let by_anchor = || {
+        if anchor.x < centre_x {
+            Side::Left
+        } else {
+            Side::Right
+        }
+    };
     match role {
         Some(
             Role::Left | Role::TiltLeft | Role::Back | Role::Forward | Role::Sniper | Role::Grid(_),
         ) => Side::Left,
-        // The G502's G7/G8 wedges sit left of its left button; elsewhere the DPI keys are central.
-        Some(Role::DpiUp | Role::DpiDown) if anchor.x < centre_x - art.width() * 0.1 => Side::Left,
         Some(
             Role::Right
             | Role::TiltRight
+            | Role::RightBack
+            | Role::RightForward
             | Role::Middle
             | Role::DpiUp
             | Role::DpiDown
             | Role::DpiCycle
-            | Role::Profile,
+            | Role::Profile
+            | Role::WheelMode,
         ) => Side::Right,
-        None => {
-            if anchor.x < centre_x {
-                Side::Left
-            } else {
-                Side::Right
-            }
-        }
+        Some(Role::ThumbWheel | Role::Gesture | Role::GKey(_)) | None => by_anchor(),
     }
 }
 

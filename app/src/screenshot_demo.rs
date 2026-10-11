@@ -60,7 +60,12 @@ pub fn sample_library() -> Library {
 
 // --- Simulated extras ---------------------------------------------------------------
 
-fn btn(id: u16, name: &str, default: ButtonAction, hotspot: Option<(f32, f32)>) -> ButtonCaps {
+pub(crate) fn btn(
+    id: u16,
+    name: &str,
+    default: ButtonAction,
+    hotspot: Option<(f32, f32)>,
+) -> ButtonCaps {
     ButtonCaps {
         id,
         name: name.into(),
@@ -70,18 +75,18 @@ fn btn(id: u16, name: &str, default: ButtonAction, hotspot: Option<(f32, f32)>) 
     }
 }
 
-fn mouse_btn(b: MouseButton) -> ButtonAction {
+pub(crate) fn mouse_btn(b: MouseButton) -> ButtonAction {
     ButtonAction::Mouse(b)
 }
 
-fn lit(color: Rgb) -> ZoneState {
+pub(crate) fn lit(color: Rgb) -> ZoneState {
     ZoneState {
         effect: LightingEffect::Static { color },
         brightness: 90,
     }
 }
 
-fn zone(id: u8, name: &str, effects: &[EffectKind]) -> LightingZoneCaps {
+pub(crate) fn zone(id: u8, name: &str, effects: &[EffectKind]) -> LightingZoneCaps {
     LightingZoneCaps {
         keys: Vec::new(),
         id,
@@ -102,18 +107,19 @@ fn template() -> (DeviceDescriptor, Capabilities, DeviceState) {
     )
 }
 
-struct Spec<'a> {
-    name: &'a str,
-    vendor: Vendor,
-    kind: DeviceKind,
-    pid: u16,
-    buttons: Vec<ButtonCaps>,
-    zones: Vec<LightingZoneCaps>,
-    lighting: Vec<(u8, ZoneState)>,
-    custom: Vec<(u16, ButtonAction)>,
+/// A simulated mouse (or headset): what `mouse_like` builds a snapshot from.
+pub(crate) struct Spec<'a> {
+    pub name: &'a str,
+    pub vendor: Vendor,
+    pub kind: DeviceKind,
+    pub pid: u16,
+    pub buttons: Vec<ButtonCaps>,
+    pub zones: Vec<LightingZoneCaps>,
+    pub lighting: Vec<(u8, ZoneState)>,
+    pub custom: Vec<(u16, ButtonAction)>,
 }
 
-fn mouse_like(spec: Spec) -> DeviceSnapshot {
+pub(crate) fn mouse_like(spec: Spec) -> DeviceSnapshot {
     let (d0, c0, s0) = template();
     let mut descriptor = DeviceDescriptor {
         id: format!("demo:{}:{:04x}", spec.vendor.key(), spec.pid),
@@ -370,8 +376,10 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
     }));
     let five = &EffectKind::ALL[..5];
 
-    vec![
-        g502_hero(),
+    let mut devices = vec![g502_hero()];
+    // Per-brand extras (`screenshot_brands/`) sit right after the HERO so they show in the list.
+    devices.extend(crate::screenshot_brands::devices());
+    devices.extend([
         mouse_like(Spec {
             name: "G Pro X Superlight",
             vendor: Vendor::Logitech,
@@ -437,7 +445,8 @@ pub(crate) fn extra_devices() -> Vec<DeviceSnapshot> {
             lighting: vec![(0, lit(Rgb::new(255, 204, 0)))],
             custom: vec![],
         }),
-    ]
+    ]);
+    devices
 }
 
 #[cfg(test)]

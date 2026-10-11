@@ -44,21 +44,33 @@ fn too_many_labels_are_spread_evenly() {
 #[test]
 fn labels_go_to_the_side_the_part_lives_on() {
     let art = Rect::from_min_max(pos2(0.0, 0.0), pos2(200.0, 300.0));
-    assert_eq!(side_for(Some(Role::Back), pos2(10.0, 0.0), art), Side::Left);
+    let side = |role, x| side_for(None, role, pos2(x, 0.0), art);
+    assert_eq!(side(Some(Role::Back), 10.0), Side::Left);
+    assert_eq!(side(Some(Role::Right), 10.0), Side::Right);
+    assert_eq!(side(None, 40.0), Side::Left);
+    assert_eq!(side(None, 160.0), Side::Right);
+    // Central DPI keys go right; a model that puts them elsewhere says so with a hint.
+    assert_eq!(side(Some(Role::DpiUp), 98.0), Side::Right);
+    assert_eq!(side(Some(Role::DpiCycle), 100.0), Side::Right);
+    // Right-flank thumb buttons and the wheel-mode key go right; the thumb wheel, gesture
+    // button and extra keys go where they sit.
+    assert_eq!(side(Some(Role::RightBack), 190.0), Side::Right);
+    assert_eq!(side(Some(Role::WheelMode), 100.0), Side::Right);
+    assert_eq!(side(Some(Role::ThumbWheel), 20.0), Side::Left);
+    assert_eq!(side(Some(Role::Gesture), 180.0), Side::Right);
+    assert_eq!(side(Some(Role::GKey(7)), 30.0), Side::Left);
+}
+
+#[test]
+fn a_part_s_own_preference_beats_the_role_and_the_anchor() {
+    let art = Rect::from_min_max(pos2(0.0, 0.0), pos2(200.0, 300.0));
     assert_eq!(
-        side_for(Some(Role::Right), pos2(10.0, 0.0), art),
+        side_for(Some(Side::Right), Some(Role::Back), pos2(10.0, 0.0), art),
         Side::Right
     );
-    assert_eq!(side_for(None, pos2(40.0, 0.0), art), Side::Left);
-    assert_eq!(side_for(None, pos2(160.0, 0.0), art), Side::Right);
-    // A DPI wedge far left of the centre line (G502) is labelled on the left.
     assert_eq!(
-        side_for(Some(Role::DpiUp), pos2(40.0, 0.0), art),
+        side_for(Some(Side::Left), None, pos2(190.0, 0.0), art),
         Side::Left
-    );
-    assert_eq!(
-        side_for(Some(Role::DpiUp), pos2(98.0, 0.0), art),
-        Side::Right
     );
 }
 
@@ -92,28 +104,33 @@ fn untangled(laid: &[Laid], items: &[Callout]) -> bool {
     true
 }
 
-/// The user's G502 HERO, laid out at several sizes: no leader crosses another or runs
-/// over a foreign marker, and the pills never overlap or leave the area.
-#[test]
-fn real_g502_labels_stay_untangled_at_every_size() {
-    use super::super::mouse::{Kind, MouseArt, art_rect};
-    let hero = crate::screenshot_demo::extra_devices()
+/// The demo devices with a model-accurate drawing, laid out at several sizes: no leader
+/// crosses another or runs over a foreign marker, and the pills never overlap or leave the area.
+fn labels_stay_untangled(pid: u16, buttons: usize) {
+    use super::super::mouse::{Design, MouseArt, art_rect};
+    let dev = crate::screenshot_demo::extra_devices()
         .into_iter()
-        .find(|d| d.descriptor.product_id == 0xc08b)
+        .find(|d| d.descriptor.product_id == pid)
         .unwrap();
+    let design = Design::for_name(&dev.descriptor.name);
+    assert!(
+        matches!(design, Design::Model(_)),
+        "{}",
+        dev.descriptor.name
+    );
     for h in [330.0f32, 350.0, 380.0, 430.0, 460.0, 520.0, 580.0] {
         let area = Rect::from_min_size(pos2(0.0, 0.0), vec2(900.0, h.max(height_needed(7))));
-        let rect = art_rect(area.shrink2(vec2(250.0, 6.0)), Kind::G502);
-        let art = MouseArt::new(rect, Kind::G502);
+        let rect = art_rect(area.shrink2(vec2(250.0, 6.0)), design);
+        let art = MouseArt::new(rect, design);
         let items: Vec<Callout> = art
-            .place(&hero.capabilities.buttons)
+            .place(&dev.capabilities.buttons)
             .iter()
             .map(|pl| Callout {
-                side: side_for(pl.role, pl.anchor, rect),
+                side: side_for(pl.side, pl.role, pl.anchor, rect),
                 ..item(pl.id, pl.anchor.x, pl.anchor.y, Side::Left)
             })
             .collect();
-        assert_eq!(items.len(), 11);
+        assert_eq!(items.len(), buttons);
         let ys = (area.min.y + PILL_H / 2.0, area.max.y - PILL_H / 2.0);
         let mut all: Vec<Laid> = Vec::new();
         for (side, col, bend) in [
@@ -140,7 +157,8 @@ fn real_g502_labels_stay_untangled_at_every_size() {
             let laid = layout_side(&items, &idx, side, col, bend, ys, &[]);
             assert!(
                 untangled(&laid, &items),
-                "h={h} {side:?}: {:?}",
+                "{} h={h} {side:?}: {:?}",
+                dev.descriptor.name,
                 laid.iter()
                     .map(|l| (items[l.item].id, l.line))
                     .collect::<Vec<_>>()
@@ -162,6 +180,16 @@ fn real_g502_labels_stay_untangled_at_every_size() {
             }
         }
     }
+}
+
+#[test]
+fn real_g502_labels_stay_untangled_at_every_size() {
+    labels_stay_untangled(0xc08b, 11);
+}
+
+#[test]
+fn mx_master_labels_stay_untangled_at_every_size() {
+    labels_stay_untangled(0xb034, 6);
 }
 
 #[test]

@@ -14,6 +14,7 @@ mod pages;
 mod persist;
 mod png;
 mod screenshot;
+mod screenshot_brands;
 mod screenshot_demo;
 mod sidebar;
 mod state;

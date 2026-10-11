@@ -50,13 +50,52 @@ pub fn set_only(list: &str) {
     );
 }
 
-struct Step {
+pub(crate) struct Step {
     name: &'static str,
     route: Route,
     device: Option<&'static str>,
     tab: Tab,
     theme: Theme,
     prep: fn(&mut App),
+}
+
+impl Step {
+    /// A device page (`model_key`, e.g. `"logitech:b034"`) at `tab`, in the dark theme.
+    pub(crate) fn device(
+        name: &'static str,
+        model_key: &'static str,
+        tab: Tab,
+        prep: fn(&mut App),
+    ) -> Self {
+        Self {
+            name,
+            route: Route::Device,
+            device: Some(model_key),
+            tab,
+            theme: Theme::Dark,
+            prep,
+        }
+    }
+
+    /// The same step in the light theme.
+    pub(crate) fn light(self) -> Self {
+        Self {
+            theme: Theme::Light,
+            ..self
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Does this step's device appear among `devices`?
+    #[cfg(test)]
+    pub(crate) fn targets(&self, devices: &[crate::worker::DeviceSnapshot]) -> bool {
+        self.device
+            .is_none_or(|k| devices.iter().any(|d| d.descriptor.model_key == k))
+    }
 }
 
 fn nothing(_: &mut App) {}
@@ -82,7 +121,7 @@ fn steps() -> Vec<Step> {
         theme: Theme::Light,
         ..s
     };
-    let all = vec![
+    let mut all = vec![
         dev("01-g502-hero-assignments", HERO, Tab::Assignments, |a| {
             a.pages.assign.selected = Some(5)
         }),
@@ -138,21 +177,24 @@ fn steps() -> Vec<Step> {
         }),
         dev("19-deathadder-lighting", DEATHADDER, Tab::Lighting, nothing),
         dev("20-headset-lighting", HEADSET, Tab::Lighting, nothing),
-        dev("21-info-permission-banner", LOGITECH, Tab::Info, |a| {
-            a.show_sample_issue();
-            a.toasts.push(ToastKind::Success, "Saved to G502 X Plus");
-            a.toasts.push(
-                ToastKind::Error,
-                "Report rate: not supported by this device",
-            );
-        }),
-        page("22-empty-state", Route::Device).with_prep(|a| {
-            a.clear_issues();
-            a.toasts.clear();
-            a.queue_action(Action::SetDemo(false));
-            a.clear_devices();
-        }),
     ];
+    // The per-brand model steps come first: the next step leaves a banner and toasts behind
+    // and the one after drops every device.
+    all.extend(crate::screenshot_brands::steps());
+    all.push(dev("21-info-permission-banner", LOGITECH, Tab::Info, |a| {
+        a.show_sample_issue();
+        a.toasts.push(ToastKind::Success, "Saved to G502 X Plus");
+        a.toasts.push(
+            ToastKind::Error,
+            "Report rate: not supported by this device",
+        );
+    }));
+    all.push(page("22-empty-state", Route::Device).with_prep(|a| {
+        a.clear_issues();
+        a.toasts.clear();
+        a.queue_action(Action::SetDemo(false));
+        a.clear_devices();
+    }));
     match ONLY.get() {
         Some(only) if !only.is_empty() => all
             .into_iter()
