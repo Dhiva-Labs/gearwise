@@ -1,2 +1,13 @@
 /target
 *.json.tmp
+packaging/vendor/*.tar.xz
+packaging/vendor/SHA256SUMS
+/vendor
+debian/.rust
+debian/.cargo
+debian/.home
+debian/gearwise/
+debian/files
+debian/*.substvars
+debian/*.debhelper*
+debian/debhelper-build-stamp

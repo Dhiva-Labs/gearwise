@@ -1,0 +1,12 @@
+gearwise (0.1.0~noble1) noble; urgency=medium
+
+  * Initial release.
+  * Logitech HID++ 2.0 (wired, Lightspeed/Unifying/Bolt, Bluetooth): DPI,
+    report rate up to 8 kHz, lighting, per-key RGB, onboard profiles with
+    button bindings, G-keys, battery.
+  * Razer, Corsair (Bragi and legacy) and SteelSeries drivers.
+  * Button assignments, macros (uinput playback) and profiles that follow
+    every change and are re-applied when a device connects.
+  * Model-accurate artwork for 27 mice and the Corsair K55 RGB PRO.
+
+ -- Dhiva Labs <dhivakar1010@gmail.com>  Sun, 11 Oct 2026 08:30:00 +0530

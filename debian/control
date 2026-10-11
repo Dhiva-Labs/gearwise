@@ -1,0 +1,37 @@
+Source: gearwise
+Section: utils
+Priority: optional
+Maintainer: Dhiva Labs <dhivakar1010@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               gcc,
+               libc6-dev,
+               xz-utils
+Standards-Version: 4.6.2
+Homepage: https://github.com/Dhiva-Labs/gearwise
+Vcs-Browser: https://github.com/Dhiva-Labs/gearwise
+Vcs-Git: https://github.com/Dhiva-Labs/gearwise.git
+Rules-Requires-Root: no
+
+Package: gearwise
+Architecture: amd64
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         libgl1,
+         libegl1,
+         libxkbcommon0,
+         libwayland-client0,
+         libwayland-cursor0,
+         libx11-6,
+         libxcursor1,
+         libxrandr2,
+         libxi6,
+         libxkbcommon-x11-0
+Recommends: udev
+Description: Configure gaming mice and keyboards
+ Gearwise configures mice and keyboards from Logitech, Razer, Corsair and
+ SteelSeries: DPI stages, report rate, RGB lighting (zones and per-key),
+ button assignments, onboard profiles, macros and per-application
+ profiles, in one lightweight native app.
+ .
+ A udev rule is installed so the logged-in user can open the devices and
+ /dev/uinput (for macros) without root.
