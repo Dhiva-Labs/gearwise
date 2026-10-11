@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    # Oldest supported runner, so the binary runs on Ubuntu 22.04 and newer.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p gearwise
+      - name: Package
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          mkdir -p dist
+          packaging/linux/build-deb.sh target/release/gearwise "$v" dist
+          t=gearwise-$v-linux-x86_64
+          mkdir -p "$t/icons"
+          cp target/release/gearwise README.md LICENSE CHANGELOG.md "$t/"
+          cp packaging/linux/70-gearwise.rules packaging/linux/install-udev-rules.sh packaging/linux/gearwise.desktop "$t/"
+          cp packaging/icons/*.png "$t/icons/"
+          tar -czf "dist/$t.tar.gz" "$t"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p gearwise
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = "$env:GITHUB_REF_NAME".TrimStart("v")
+          $t = "gearwise-$v-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path "$t", dist | Out-Null
+          Copy-Item target/release/gearwise.exe, README.md, LICENSE, CHANGELOG.md "$t/"
+          Compress-Archive -Path "$t/*" -DestinationPath "dist/$t.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release notes from the changelog
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          awk -v v="$v" '$0 ~ "^## " v {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
+          cat >> notes.md <<'MD'
+
+          ### Install
+
+          - **Ubuntu (PPA):** `sudo add-apt-repository ppa:dhiva-labs/apps && sudo apt install gearwise`
+          - **Debian/Ubuntu (.deb):** download `gearwise_*_amd64.deb` below and `sudo apt install ./gearwise_*_amd64.deb`
+          - **Any Linux:** extract the tarball, run `sudo ./install-udev-rules.sh` once, then `./gearwise`
+          - **Windows:** extract the zip and run `gearwise.exe` (close G HUB / Synapse / iCUE / GG first)
+          MD
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Gearwise ${GITHUB_REF_NAME#v}" --notes-file notes.md

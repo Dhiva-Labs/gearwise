@@ -1,4 +1,7 @@
-//! Gearwise: configure Logitech, Razer and Corsair mice and keyboards.
+//! Gearwise: configure Logitech, Razer, Corsair and SteelSeries mice and keyboards.
+
+// A GUI app: no console window on Windows (release builds keep stderr off).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
 mod debounce;
