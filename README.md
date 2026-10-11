@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo/gearwise.svg" width="96" alt="Gearwise logo"></p>
+
 # Gearwise
 
 One lightweight app to configure gaming mice and keyboards from **Logitech,
@@ -6,13 +8,13 @@ report rate, RGB lighting (zones and per-key), button assignments, onboard
 profiles, macros and per-application profiles. An open alternative to
 G HUB, Synapse, iCUE and GG that ships as a single small native binary.
 
-![Button assignments on a real G502 HERO, read from its onboard memory](app/screenshots/22-real-g502-hero-assignments.png)
+![Button assignments on a real G502 HERO, read from its onboard memory](app/screenshots/00-real-g502-hero.png)
 
 | | |
 |---|---|
-| ![DPI stages](app/screenshots/02-sensitivity.png) | ![Mouse lighting](app/screenshots/03-lighting-mouse.png) |
-| ![Per-key RGB](app/screenshots/05-lighting-per-key.png) | ![Zone lighting](app/screenshots/20-k55-zone-lighting.png) |
-| ![MMO side grid](app/screenshots/15-naga-button-grid.png) | ![Macros](app/screenshots/09-macros.png) |
+| ![DPI stages](app/screenshots/03-sensitivity.png) | ![Mouse lighting](app/screenshots/02-g502-hero-lighting.png) |
+| ![Per-key RGB](app/screenshots/06-lighting-per-key.png) | ![Zone lighting](app/screenshots/04-k55-zone-lighting.png) |
+| ![MMO side grid](app/screenshots/18-naga-button-grid.png) | ![Macros](app/screenshots/11-macros.png) |
 
 ## Highlights
 
