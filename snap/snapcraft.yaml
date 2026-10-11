@@ -65,7 +65,9 @@ parts:
     # rustup-init: the rust plugin's rustup integration is fragile in
     # managed builds.
     plugin: nil
+    # Committed files only (not the local target/ directory).
     source: .
+    source-type: git
     build-packages:
       - curl
       - gcc
