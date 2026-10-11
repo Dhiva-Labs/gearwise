@@ -2,7 +2,7 @@
 //! driver discovers. Changes nothing except switching a device that was left
 //! in host mode back to its onboard profiles.
 //!
-//!     cargo run -p gearwise-corsair --example probe
+//!     cargo run -p gearwise-corsair --example corsair_probe
 
 use gearwise_core::DeviceManager;
 use gearwise_corsair::CorsairDriver;

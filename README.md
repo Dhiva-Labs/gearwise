@@ -130,8 +130,8 @@ after the last change) so dragging a slider never hammers flash.
 ```bash
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p gearwise-logitech --example probe   # read-only dump of connected Logitech devices
-cargo run -p gearwise-corsair --example probe
+cargo run -p gearwise-logitech --example logitech_probe   # read-only dump of connected Logitech devices
+cargo run -p gearwise-corsair --example corsair_probe
 ```
 
 ## License
