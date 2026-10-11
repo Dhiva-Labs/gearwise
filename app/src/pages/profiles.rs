@@ -230,7 +230,9 @@ fn detail(
     widgets::card(ui, |ui| {
         ui.set_width(w - 34.0);
         ui.horizontal(|ui| {
-            widgets::title(ui, &profile.name);
+            // Leave room for the badge and the three icon buttons on the right.
+            let name_w = (ui.available_width() - 190.0).max(100.0);
+            widgets::title_fit(ui, &profile.name, name_w);
             if is_active {
                 widgets::badge(ui, "Active", palette(ui.ctx()).accent);
             }

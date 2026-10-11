@@ -4,27 +4,16 @@ use std::sync::Arc;
 
 use egui::text::{LayoutJob, TextWrapping};
 use egui::{
-    Align2, Color32, CornerRadius, FontId, Frame, Galley, InnerResponse, Margin, Pos2, Rect,
-    Response, RichText, Sense, Stroke, StrokeKind, TextStyle, Ui, Vec2, pos2, vec2,
+    Align2, Color32, CornerRadius, FontId, Galley, Pos2, Rect, Response, RichText, Sense, Stroke,
+    StrokeKind, TextStyle, Ui, Vec2, pos2, vec2,
 };
 use gearwise_core::model::Battery;
 
 use crate::icons::{self, Icon};
+pub use crate::layout::{
+    card, card_columns, divider, empty_hint, kv, page_scroll, setting_row, viewport_height,
+};
 use crate::theme::{self, Palette, mix, palette, with_alpha};
-
-pub fn card<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
-    card_with(ui, 16, add)
-}
-
-pub fn card_with<R>(ui: &mut Ui, pad: i8, add: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
-    let pal = palette(ui.ctx());
-    Frame::new()
-        .fill(pal.card)
-        .stroke(Stroke::new(1.0, pal.border))
-        .corner_radius(CornerRadius::same(12))
-        .inner_margin(Margin::same(pad))
-        .show(ui, add)
-}
 
 /// Small upper-case section label.
 pub fn section(ui: &mut Ui, text: &str) -> Response {
@@ -61,6 +50,27 @@ pub fn bold(ui: &mut Ui, text: impl Into<String>, style: TextStyle, color: Color
     resp
 }
 
+/// Page title that ends in an ellipsis (full text on hover) when wider than `max_w`.
+pub fn title_fit(ui: &mut Ui, text: &str, max_w: f32) -> Response {
+    let pal = palette(ui.ctx());
+    let font = theme::title().resolve(ui.style());
+    let natural = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font.clone(), pal.text)
+        .size()
+        .x;
+    let galley = fit_text(ui.painter(), text, font, pal.text, max_w - 1.0);
+    let (rect, resp) = ui.allocate_exact_size(galley.size() + vec2(0.7, 0.0), Sense::hover());
+    ui.painter().galley(rect.min, galley.clone(), pal.text);
+    ui.painter()
+        .galley(rect.min + vec2(0.7, 0.0), galley, pal.text);
+    if natural > max_w {
+        resp.on_hover_text(text)
+    } else {
+        resp
+    }
+}
+
 pub fn title(ui: &mut Ui, text: impl Into<String>) -> Response {
     let c = palette(ui.ctx()).text;
     bold(ui, text, theme::title(), c)
@@ -90,6 +100,19 @@ pub enum Btn {
     Secondary,
     Ghost,
     Danger,
+}
+
+/// Disabled buttons: a quiet but visible plate and muted, still readable, text.
+pub fn disabled_style(pal: &Palette, kind: Btn) -> (Color32, Stroke, Color32) {
+    let plate = match kind {
+        Btn::Primary | Btn::Secondary => mix(pal.raised, pal.window, 0.25),
+        Btn::Ghost | Btn::Danger => Color32::TRANSPARENT,
+    };
+    (
+        plate,
+        Stroke::new(1.0, mix(pal.border, pal.window, 0.2)),
+        mix(pal.muted, pal.raised, 0.25),
+    )
 }
 
 pub fn button(ui: &mut Ui, kind: Btn, icon: Option<Icon>, text: &str) -> Response {
@@ -165,7 +188,7 @@ pub fn button(ui: &mut Ui, kind: Btn, icon: Option<Icon>, text: &str) -> Respons
     let (fill, stroke, ink) = if enabled {
         (fill, stroke, ink)
     } else {
-        (with_alpha(fill, fill.a() / 2), stroke, with_alpha(ink, 90))
+        disabled_style(&pal, kind)
     };
     let p = ui.painter();
     p.rect(
@@ -214,7 +237,7 @@ pub fn icon_button(ui: &mut Ui, icon: Icon, tip: &str) -> Response {
             .rect_filled(rect, CornerRadius::same(7), pal.raised);
     }
     let ink = if !enabled {
-        with_alpha(pal.muted, 80)
+        with_alpha(pal.muted, 130)
     } else if hot {
         pal.text
     } else {
@@ -372,26 +395,6 @@ pub fn toggle(ui: &mut Ui, on: &mut bool) -> bool {
     changed
 }
 
-/// A settings row: title and description on the left, a control on the right.
-pub fn setting_row<R>(
-    ui: &mut Ui,
-    title: &str,
-    desc: &str,
-    control: impl FnOnce(&mut Ui) -> R,
-) -> R {
-    ui.horizontal(|ui| {
-        ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 2.0;
-            let c = palette(ui.ctx()).text;
-            ui.label(RichText::new(title).color(c));
-            caption(ui, desc);
-        });
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), control)
-            .inner
-    })
-    .inner
-}
-
 pub fn badge(ui: &mut Ui, text: &str, color: Color32) -> Response {
     let pal = palette(ui.ctx());
     let font = FontId::proportional(11.0);
@@ -506,44 +509,6 @@ pub fn battery_pill(ui: &mut Ui, b: &Battery) -> Response {
     resp
 }
 
-/// Label/value pair for info pages.
-pub fn kv(ui: &mut Ui, key: &str, value: &str) {
-    let pal = palette(ui.ctx());
-    ui.horizontal(|ui| {
-        ui.allocate_ui_with_layout(
-            vec2(150.0, 20.0),
-            egui::Layout::left_to_right(egui::Align::Center),
-            |ui| {
-                ui.label(RichText::new(key).color(pal.muted));
-            },
-        );
-        ui.label(RichText::new(value).color(pal.text));
-    });
-}
-
-/// Hairline divider that respects the theme.
-pub fn divider(ui: &mut Ui) {
-    let pal = palette(ui.ctx());
-    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
-    ui.painter().hline(
-        rect.x_range(),
-        rect.center().y,
-        Stroke::new(1.0, pal.border),
-    );
-}
-
-/// Centered placeholder text with an icon, for empty lists.
-pub fn empty_hint(ui: &mut Ui, icon: Icon, text: &str) {
-    let pal: Palette = palette(ui.ctx());
-    ui.vertical_centered(|ui| {
-        ui.add_space(18.0);
-        icons::show(ui, icon, 28.0, pal.muted);
-        ui.add_space(6.0);
-        muted(ui, text);
-        ui.add_space(18.0);
-    });
-}
-
 /// Paint text anchored inside `rect`, clipped to it.
 pub fn text_in(
     p: &egui::Painter,
@@ -562,54 +527,60 @@ pub fn text_in(
     p.text(pos, anchor, text, font, color);
 }
 
-/// Two cards side by side, `left_frac` of the width for the first. Both are
-/// as tall as the taller one (measured on the previous frame).
-pub fn card_columns(
-    ui: &mut Ui,
-    left_frac: f32,
-    left: impl FnOnce(&mut Ui),
-    right: impl FnOnce(&mut Ui),
-) {
-    const GAP: f32 = 16.0;
-    const FRAME: f32 = 34.0;
-    let total = ui.available_width();
-    let lw = ((total - GAP) * left_frac).floor();
-    let rw = total - GAP - lw;
-    let key = ui.id().with("card-columns-height");
-    let want: f32 = ui.ctx().data(|d| d.get_temp(key)).unwrap_or(0.0);
-    let mut natural = [0.0f32; 2];
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = GAP;
-        ui.allocate_ui_with_layout(
-            vec2(lw, 10.0),
-            egui::Layout::top_down(egui::Align::Min),
-            |ui| {
-                card(ui, |ui| {
-                    ui.set_width(lw - FRAME);
-                    ui.set_min_height(want);
-                    let y0 = ui.cursor().min.y;
-                    left(ui);
-                    natural[0] = ui.cursor().min.y - y0;
-                });
-            },
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gearwise_core::profile::Theme;
+
+    /// WCAG relative luminance contrast of two opaque colours.
+    fn contrast(a: Color32, b: Color32) -> f32 {
+        let lin = |c: u8| {
+            let c = f32::from(c) / 255.0;
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        let l = |c: Color32| 0.2126 * lin(c.r()) + 0.7152 * lin(c.g()) + 0.0722 * lin(c.b());
+        let (hi, lo) = (l(a).max(l(b)), l(a).min(l(b)));
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    #[test]
+    fn disabled_buttons_stay_readable_and_visible_in_both_themes() {
+        for theme in [Theme::Dark, Theme::Light] {
+            let pal = Palette::new(theme, Color32::from_rgb(0, 212, 170));
+            for kind in [Btn::Primary, Btn::Secondary] {
+                let (fill, stroke, ink) = disabled_style(&pal, kind);
+                assert!(contrast(ink, fill) >= 3.0, "{theme:?} text on its plate");
+                assert!(
+                    contrast(fill, pal.card) > 1.03 || contrast(stroke.color, pal.card) > 1.1,
+                    "{theme:?} the plate or its border shows against a card"
+                );
+            }
+            let (_, _, ghost_ink) = disabled_style(&pal, Btn::Ghost);
+            assert!(contrast(ghost_ink, pal.card) >= 2.5, "{theme:?} ghost text");
+        }
+    }
+
+    #[test]
+    fn titles_are_cut_with_an_ellipsis_to_their_width() {
+        let ctx = egui::Context::default();
+        crate::theme::apply(
+            &ctx,
+            &Palette::new(Theme::Dark, Color32::from_rgb(0, 212, 170)),
         );
-        ui.allocate_ui_with_layout(
-            vec2(rw, 10.0),
-            egui::Layout::top_down(egui::Align::Min),
-            |ui| {
-                card(ui, |ui| {
-                    ui.set_width(rw - FRAME);
-                    ui.set_min_height(want);
-                    let y0 = ui.cursor().min.y;
-                    right(ui);
-                    natural[1] = ui.cursor().min.y - y0;
-                });
-            },
-        );
-    });
-    let tallest = natural[0].max(natural[1]);
-    if (tallest - want).abs() > 0.5 {
-        ui.ctx().data_mut(|d| d.insert_temp(key, tallest));
-        ui.ctx().request_repaint();
+        let mut widths = (0.0, 0.0);
+        let mut out = ctx.run_ui(Default::default(), |ui| {
+            let long = "Logitech G502 HERO Gaming Mouse Wireless Pro Max Edition";
+            widths = (
+                title_fit(ui, long, 200.0).rect.width(),
+                title_fit(ui, "G502", 200.0).rect.width(),
+            );
+        });
+        out.textures_delta.clear();
+        assert!(widths.0 <= 202.0, "{widths:?}");
+        assert!(widths.1 < 120.0, "{widths:?}");
     }
 }

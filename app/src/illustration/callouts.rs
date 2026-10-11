@@ -1,14 +1,23 @@
-//! G HUB-style callouts: a marker on the device, a leader line and a label pill
-//! in the margin, stacked so labels never overlap.
+//! G HUB-style callouts: a marker on the device, a leader line and a label pill in the margin.
+//! Pills are sized to their text, stacked by the height of their anchor, and the assignment of
+//! labels to slots is untangled so leader lines never cross each other or another marker.
 
-use egui::{CornerRadius, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{
+    CornerRadius, FontId, Painter, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2,
+};
 
-use super::mouse::Role;
+use super::roles::Role;
 use crate::theme::{Palette, mix, with_alpha};
 use crate::widgets::fit_text;
 
 pub const PILL_H: f32 = 40.0;
-const GAP: f32 = 8.0;
+/// Smallest vertical gap between two pills.
+const GAP: f32 = 6.0;
+/// Horizontal space between the art's box and the pill columns (the leader's bend sits here).
+pub const LEAD: f32 = 30.0;
+const MIN_PILL_W: f32 = 104.0;
+/// Radius around a marker that other leader lines keep clear of.
+const CLEAR: f32 = 6.5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -36,12 +45,15 @@ pub struct Interaction {
     pub clicked: Option<u16>,
 }
 
-/// Which margin a button's label goes in.
-pub fn side_for(role: Option<Role>, anchor: Pos2, centre_x: f32) -> Side {
+/// Which margin a button's label goes in, given the art's `rect`.
+pub fn side_for(role: Option<Role>, anchor: Pos2, art: Rect) -> Side {
+    let centre_x = art.center().x;
     match role {
         Some(
             Role::Left | Role::TiltLeft | Role::Back | Role::Forward | Role::Sniper | Role::Grid(_),
         ) => Side::Left,
+        // The G502's G7/G8 wedges sit left of its left button; elsewhere the DPI keys are central.
+        Some(Role::DpiUp | Role::DpiDown) if anchor.x < centre_x - art.width() * 0.1 => Side::Left,
         Some(
             Role::Right
             | Role::TiltRight
@@ -86,12 +98,232 @@ pub fn stack(desired: &[f32], gap: f32, lo: f32, hi: f32) -> Vec<f32> {
     y
 }
 
-/// Draw the callouts inside `bounds` and report hover and clicks. `hover_hint` is a
-/// button hovered elsewhere (the list), highlighted here too.
+/// Height the pills of one side need so they all fit without overlapping.
+pub fn height_needed(count: usize) -> f32 {
+    count as f32 * (PILL_H + GAP)
+}
+
+// --- Geometry of the leader lines ------------------------------------------------------
+
+type Line = [Pos2; 3];
+
+fn cross(a: Pos2, b: Pos2, c: Pos2) -> f32 {
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+}
+
+/// Do segments `p1-p2` and `p3-p4` properly intersect?
+fn segments_cross(p1: Pos2, p2: Pos2, p3: Pos2, p4: Pos2) -> bool {
+    let (d1, d2) = (cross(p3, p4, p1), cross(p3, p4, p2));
+    let (d3, d4) = (cross(p1, p2, p3), cross(p1, p2, p4));
+    d1 * d2 < 0.0 && d3 * d4 < 0.0
+}
+
+fn lines_cross(a: &Line, b: &Line) -> bool {
+    (0..2).any(|i| (0..2).any(|j| segments_cross(a[i], a[i + 1], b[j], b[j + 1])))
+}
+
+fn dist_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
+    let ab = b - a;
+    let t = if ab.length_sq() < 1e-6 {
+        0.0
+    } else {
+        ((p - a).dot(ab) / ab.length_sq()).clamp(0.0, 1.0)
+    };
+    (p - (a + ab * t)).length()
+}
+
+/// Does `line` run closer than [`CLEAR`] to `marker`?
+fn runs_over(line: &Line, marker: Pos2) -> bool {
+    (0..2).any(|s| dist_to_segment(marker, line[s], line[s + 1]) < CLEAR)
+}
+
+/// One label's place: its pill and the leader from the marker to it.
+struct Laid {
+    item: usize,
+    pill: Rect,
+    line: Line,
+}
+
+/// Cost of putting label `item` (by anchor order) into `slot`, apart from crossings: how far it
+/// sits from its marker, and every foreign marker its leader runs over.
+const MOVE_COST: f32 = 0.02;
+const OVER_COST: f32 = 300.0;
+const CROSS_COST: f32 = 1000.0;
+/// Search effort cap, so a crowded side can never stall a frame.
+const NODE_LIMIT: usize = 60_000;
+
+struct Search<'a> {
+    n: usize,
+    single: &'a [Vec<f32>],
+    crosses: &'a dyn Fn(usize, usize, usize, usize) -> bool,
+    best: f32,
+    best_perm: Vec<usize>,
+    nodes: usize,
+}
+
+impl Search<'_> {
+    /// Fill slots in order, trying cheap labels first and pruning against the best so far.
+    fn dfs(&mut self, perm: &mut Vec<usize>, used: &mut [bool], cost: f32) {
+        self.nodes += 1;
+        let slot = perm.len();
+        if slot == self.n {
+            if cost < self.best {
+                self.best = cost;
+                self.best_perm = perm.clone();
+            }
+            return;
+        }
+        let mut cands: Vec<usize> = (0..self.n).filter(|i| !used[*i]).collect();
+        cands.sort_by(|a, b| self.single[slot][*a].total_cmp(&self.single[slot][*b]));
+        for item in cands {
+            if self.nodes > NODE_LIMIT {
+                return;
+            }
+            let mut next = cost + self.single[slot][item];
+            for (s2, i2) in perm.iter().enumerate() {
+                if (self.crosses)(s2, *i2, slot, item) {
+                    next += CROSS_COST;
+                }
+            }
+            if next >= self.best {
+                continue;
+            }
+            perm.push(item);
+            used[item] = true;
+            self.dfs(perm, used, next);
+            perm.pop();
+            used[item] = false;
+        }
+    }
+}
+
+/// Lay out one side: sort by anchor height, stack the slots, then find the assignment of labels
+/// to slots with the fewest crossings and markers run over (an exact search, capped).
+/// `obstacles` are lines already laid out on the other side.
+fn layout_side(
+    items: &[Callout],
+    idx: &[usize],
+    side: Side,
+    column: Rect,
+    bend_x: f32,
+    bounds: (f32, f32),
+    obstacles: &[Line],
+) -> Vec<Laid> {
+    let mut order: Vec<usize> = idx.to_vec();
+    order.sort_by(|a, b| {
+        items[*a]
+            .anchor
+            .y
+            .total_cmp(&items[*b].anchor.y)
+            .then(items[*a].anchor.x.total_cmp(&items[*b].anchor.x))
+    });
+    let n = order.len();
+    let desired: Vec<f32> = order.iter().map(|i| items[*i].anchor.y).collect();
+    let slots = stack(&desired, PILL_H + GAP, bounds.0, bounds.1);
+    let edge_x = if side == Side::Left {
+        column.max.x
+    } else {
+        column.min.x
+    };
+    // The leader of the k-th item (by anchor height) sitting in `slot`.
+    let line_for = |k: usize, slot: usize| -> Line {
+        [
+            items[order[k]].anchor,
+            pos2(bend_x, slots[slot]),
+            pos2(edge_x, slots[slot]),
+        ]
+    };
+    let single: Vec<Vec<f32>> = (0..n)
+        .map(|slot| {
+            (0..n)
+                .map(|k| {
+                    let line = line_for(k, slot);
+                    let over = (0..n)
+                        .filter(|j| *j != k && runs_over(&line, items[order[*j]].anchor))
+                        .count() as f32;
+                    let blocked = obstacles.iter().filter(|o| lines_cross(&line, o)).count() as f32;
+                    over * OVER_COST
+                        + blocked * CROSS_COST
+                        + (slots[slot] - items[order[k]].anchor.y).abs() * MOVE_COST
+                })
+                .collect()
+        })
+        .collect();
+    let crosses = |s1: usize, k1: usize, s2: usize, k2: usize| {
+        lines_cross(&line_for(k1, s1), &line_for(k2, s2))
+    };
+    let identity: Vec<usize> = (0..n).collect();
+    let identity_cost: f32 = (0..n).map(|s| single[s][s]).sum::<f32>()
+        + (0..n)
+            .flat_map(|a| (a + 1..n).map(move |b| (a, b)))
+            .filter(|(a, b)| crosses(*a, *a, *b, *b))
+            .count() as f32
+            * CROSS_COST;
+    let mut search = Search {
+        n,
+        single: &single,
+        crosses: &crosses,
+        best: identity_cost + 1e-3,
+        best_perm: identity,
+        nodes: 0,
+    };
+    search.dfs(&mut Vec::with_capacity(n), &mut vec![false; n], 0.0);
+    let perm = search.best_perm;
+    perm.iter()
+        .enumerate()
+        .map(|(slot, k)| {
+            let y = slots[slot];
+            let pill = Rect::from_min_max(
+                pos2(column.min.x, y - PILL_H / 2.0),
+                pos2(column.max.x, y + PILL_H / 2.0),
+            );
+            Laid {
+                item: order[*k],
+                pill,
+                line: line_for(*k, slot),
+            }
+        })
+        .collect()
+}
+
+// --- Measuring and drawing -------------------------------------------------------------
+
+/// Width one label's pill wants for its text, capped at `max`.
+fn pill_width(p: &Painter, c: &Callout, max: f32) -> f32 {
+    let w = |t: &str, size: f32| {
+        p.layout_no_wrap(
+            t.to_string(),
+            FontId::proportional(size),
+            egui::Color32::WHITE,
+        )
+        .size()
+        .x
+    };
+    (w(&c.title, 12.5).max(w(&c.detail, 11.5)) + 22.0).clamp(MIN_PILL_W, max.max(MIN_PILL_W))
+}
+
+/// (left, right) column widths that fit every label's text, each capped at `max`.
+pub fn column_widths(p: &Painter, items: &[Callout], max: f32) -> (f32, f32) {
+    let mut out = (MIN_PILL_W, MIN_PILL_W);
+    for c in items {
+        let w = pill_width(p, c, max);
+        match c.side {
+            Side::Left => out.0 = out.0.max(w),
+            Side::Right => out.1 = out.1.max(w),
+        }
+    }
+    out
+}
+
+/// Draw the callouts around `art` inside `bounds` and report hover and clicks. `widths` are
+/// the pill columns (see [`column_widths`]); `hover_hint` is a button hovered elsewhere (the
+/// list), highlighted here too.
+#[allow(clippy::too_many_arguments)]
 pub fn show(
     ui: &mut Ui,
     bounds: Rect,
-    pill_w: f32,
+    art: Rect,
+    widths: (f32, f32),
     items: &[Callout],
     selected: Option<u16>,
     hover_hint: Option<u16>,
@@ -101,34 +333,27 @@ pub fn show(
     let base = ui.id().with("callouts");
     let shown = |c: &Callout| !c.compact || selected == Some(c.id) || hover_hint == Some(c.id);
 
-    let mut laid: Vec<(usize, Rect, [Pos2; 3])> = Vec::new();
-    for side in [Side::Left, Side::Right] {
-        let mut idx: Vec<usize> = (0..items.len())
+    let left_col = Rect::from_min_max(
+        pos2(art.min.x - LEAD - widths.0, bounds.min.y),
+        pos2(art.min.x - LEAD, bounds.max.y),
+    );
+    let right_col = Rect::from_min_max(
+        pos2(art.max.x + LEAD, bounds.min.y),
+        pos2(art.max.x + LEAD + widths.1, bounds.max.y),
+    );
+    let ys = (bounds.min.y + PILL_H / 2.0, bounds.max.y - PILL_H / 2.0);
+    let mut laid: Vec<Laid> = Vec::new();
+    let mut obstacles: Vec<Line> = Vec::new();
+    for (side, col, bend) in [
+        (Side::Left, left_col, art.min.x - LEAD * 0.45),
+        (Side::Right, right_col, art.max.x + LEAD * 0.45),
+    ] {
+        let idx: Vec<usize> = (0..items.len())
             .filter(|i| items[*i].side == side && shown(&items[*i]))
             .collect();
-        idx.sort_by(|a, b| items[*a].anchor.y.total_cmp(&items[*b].anchor.y));
-        let desired: Vec<f32> = idx.iter().map(|i| items[*i].anchor.y).collect();
-        let ys = stack(
-            &desired,
-            PILL_H + GAP,
-            bounds.min.y + PILL_H / 2.0,
-            bounds.max.y - PILL_H / 2.0,
-        );
-        for (i, y) in idx.into_iter().zip(ys) {
-            let x = if side == Side::Left {
-                bounds.min.x
-            } else {
-                bounds.max.x - pill_w
-            };
-            let pill = Rect::from_min_size(pos2(x, y - PILL_H / 2.0), vec2(pill_w, PILL_H));
-            let edge = if side == Side::Left {
-                pos2(pill.max.x, y)
-            } else {
-                pos2(pill.min.x, y)
-            };
-            let elbow = pos2(edge.x + if side == Side::Left { 18.0 } else { -18.0 }, y);
-            laid.push((i, pill, [items[i].anchor, elbow, edge]));
-        }
+        let side_laid = layout_side(items, &idx, side, col, bend, ys, &obstacles);
+        obstacles.extend(side_laid.iter().map(|l| l.line));
+        laid.extend(side_laid);
     }
 
     // Interaction first, so painting can show the hover state of this very frame.
@@ -149,8 +374,8 @@ pub fn show(
             base.with(("dot", c.id)),
             sense,
         )];
-        if let Some((_, pill, _)) = laid.iter().find(|(i, ..)| *i == n) {
-            resps.push(ui.interact(*pill, base.with(("pill", c.id)), sense));
+        if let Some(l) = laid.iter().find(|l| l.item == n) {
+            resps.push(ui.interact(l.pill, base.with(("pill", c.id)), sense));
         }
         over[n] = resps.iter().any(|r| r.hovered());
         if over[n] {
@@ -169,34 +394,42 @@ pub fn show(
             p.circle_stroke(c.anchor, 11.0, Stroke::new(1.5, pal.accent));
         }
     }
-    for (i, pill, line) in &laid {
-        let c = &items[*i];
-        let is_sel = selected == Some(c.id);
-        let lit = lit(*i, c);
-        let line_col = if lit {
-            with_alpha(pal.accent, 230)
-        } else {
-            with_alpha(pal.muted, 120)
-        };
+    // Lines first so every pill and marker sits on top of them; active ones last.
+    let mut order: Vec<&Laid> = laid.iter().collect();
+    order.sort_by_key(|l| lit(l.item, &items[l.item]));
+    for l in &order {
+        let active = lit(l.item, &items[l.item]);
         p.add(Shape::line(
-            line.to_vec(),
-            Stroke::new(if lit { 1.5 } else { 1.0 }, line_col),
+            l.line.to_vec(),
+            Stroke::new(
+                if active { 1.5 } else { 1.0 },
+                if active {
+                    with_alpha(pal.accent, 230)
+                } else {
+                    with_alpha(pal.muted, 130)
+                },
+            ),
         ));
+    }
+    for l in &order {
+        let c = &items[l.item];
+        let is_sel = selected == Some(c.id);
+        let active = lit(l.item, c);
         if !c.compact {
-            if lit {
+            if active {
                 p.circle_filled(c.anchor, 11.0, with_alpha(pal.accent, 44));
             }
             p.circle(
                 c.anchor,
-                if lit { 5.5 } else { 4.5 },
-                if c.custom || lit {
+                if active { 5.5 } else { 4.5 },
+                if c.custom || active {
                     pal.accent
                 } else {
                     pal.card
                 },
                 Stroke::new(
                     1.5,
-                    if lit || c.custom {
+                    if active || c.custom {
                         pal.accent
                     } else {
                         pal.muted
@@ -204,24 +437,24 @@ pub fn show(
                 ),
             );
         }
-        let fill = if lit {
+        let fill = if active {
             mix(pal.card, pal.accent, 0.14)
         } else {
             pal.card
         };
-        let border = if lit {
+        let border = if active {
             pal.accent
         } else {
             mix(pal.border, pal.text, 0.1)
         };
         p.rect(
-            *pill,
+            l.pill,
             CornerRadius::same(10),
             fill,
             Stroke::new(if is_sel { 1.6 } else { 1.0 }, border),
             StrokeKind::Inside,
         );
-        let text_w = pill.width() - 20.0;
+        let text_w = l.pill.width() - 20.0;
         let title = fit_text(
             &p,
             &c.title,
@@ -229,7 +462,7 @@ pub fn show(
             if c.enabled { pal.text } else { pal.muted },
             text_w,
         );
-        p.galley(pill.min + vec2(10.0, 6.0), title, pal.text);
+        p.galley(l.pill.min + vec2(10.0, 6.0), title, pal.text);
         let detail_col = if c.custom {
             pal.accent_text()
         } else {
@@ -242,62 +475,10 @@ pub fn show(
             detail_col,
             text_w,
         );
-        p.galley(pill.min + vec2(10.0, 22.0), detail, detail_col);
+        p.galley(l.pill.min + vec2(10.0, 22.0), detail, detail_col);
     }
     out
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn valid(ys: &[f32], gap: f32, lo: f32, hi: f32) {
-        assert!(
-            ys.windows(2).all(|w| w[1] - w[0] >= gap - 1e-3),
-            "{ys:?} overlap"
-        );
-        assert!(
-            ys.iter().all(|y| *y >= lo - 1e-3 && *y <= hi + 1e-3),
-            "{ys:?} outside {lo}..{hi}"
-        );
-    }
-
-    #[test]
-    fn spaced_labels_stay_where_they_want_to_be() {
-        let ys = stack(&[50.0, 150.0, 300.0], 48.0, 20.0, 400.0);
-        assert_eq!(ys, vec![50.0, 150.0, 300.0]);
-    }
-
-    #[test]
-    fn crowded_labels_are_pushed_apart_in_order() {
-        let ys = stack(&[100.0, 104.0, 106.0, 110.0], 48.0, 20.0, 400.0);
-        valid(&ys, 48.0, 20.0, 400.0);
-        assert!(ys[0] <= 100.0 + 1e-3 || ys[0] >= 20.0);
-        assert!(ys.windows(2).all(|w| w[0] < w[1]));
-    }
-
-    #[test]
-    fn labels_near_the_bottom_shift_up_instead_of_leaving_the_box() {
-        let ys = stack(&[380.0, 390.0, 395.0], 48.0, 20.0, 400.0);
-        valid(&ys, 48.0, 20.0, 400.0);
-        assert_eq!(*ys.last().unwrap(), 400.0);
-    }
-
-    #[test]
-    fn too_many_labels_are_spread_evenly() {
-        let ys = stack(&[10.0; 6], 48.0, 0.0, 100.0);
-        assert_eq!(ys.len(), 6);
-        assert!((ys[5] - 100.0).abs() < 1e-3 && ys[0].abs() < 1e-3);
-        assert!(ys.windows(2).all(|w| (w[1] - w[0] - 20.0).abs() < 1e-3));
-        assert!(stack(&[], 48.0, 0.0, 100.0).is_empty());
-    }
-
-    #[test]
-    fn labels_go_to_the_side_the_part_lives_on() {
-        let c = 100.0;
-        assert_eq!(side_for(Some(Role::Back), pos2(10.0, 0.0), c), Side::Left);
-        assert_eq!(side_for(Some(Role::Right), pos2(10.0, 0.0), c), Side::Right);
-        assert_eq!(side_for(None, pos2(40.0, 0.0), c), Side::Left);
-        assert_eq!(side_for(None, pos2(160.0, 0.0), c), Side::Right);
-    }
-}
+mod tests;

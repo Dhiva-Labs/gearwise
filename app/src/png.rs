@@ -1,11 +1,20 @@
-//! Minimal PNG writer for screenshot mode: 8-bit RGB, adaptive row filters (all five),
-//! zlib via `miniz_oxide` (already part of eframe's dependency tree).
+//! Minimal PNG writer for screenshot mode and icon export: 8-bit RGB or RGBA, adaptive
+//! row filters (all five), zlib via `miniz_oxide` (already part of eframe's dependency tree).
 
 const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 
 /// Encode tightly packed RGB pixels (`width * height * 3` bytes).
 pub fn encode_rgb(width: u32, height: u32, rgb: &[u8]) -> Vec<u8> {
-    let row = width as usize * 3;
+    encode(width, height, 3, rgb)
+}
+
+/// Encode tightly packed straight-alpha RGBA pixels (`width * height * 4` bytes).
+pub fn encode_rgba(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
+    encode(width, height, 4, rgba)
+}
+
+fn encode(width: u32, height: u32, bpp: usize, rgb: &[u8]) -> Vec<u8> {
+    let row = width as usize * bpp;
     assert_eq!(
         rgb.len(),
         row * height as usize,
@@ -21,7 +30,7 @@ pub fn encode_rgb(width: u32, height: u32, rgb: &[u8]) -> Vec<u8> {
         } else {
             &rgb[(y - 1) * row..y * row]
         };
-        filter_row(cur, prev, &mut raw);
+        filter_row(cur, prev, bpp, &mut raw);
     }
 
     let mut out = Vec::with_capacity(raw.len() / 8 + 64);
@@ -29,7 +38,8 @@ pub fn encode_rgb(width: u32, height: u32, rgb: &[u8]) -> Vec<u8> {
     let mut ihdr = Vec::with_capacity(13);
     ihdr.extend_from_slice(&width.to_be_bytes());
     ihdr.extend_from_slice(&height.to_be_bytes());
-    ihdr.extend_from_slice(&[8, 2, 0, 0, 0]); // 8-bit, truecolor, deflate, adaptive filter, no interlace
+    // 8-bit, truecolor (with alpha for 4 channels), deflate, adaptive filter, no interlace
+    ihdr.extend_from_slice(&[8, if bpp == 4 { 6 } else { 2 }, 0, 0, 0]);
     chunk(&mut out, b"IHDR", &ihdr);
     chunk(
         &mut out,
@@ -57,10 +67,10 @@ fn paeth(a: u8, b: u8, c: u8) -> u8 {
 }
 
 /// Apply PNG filter `kind` (0 none, 1 sub, 2 up, 3 average, 4 paeth) to byte `i` of a row.
-fn filtered(kind: u8, cur: &[u8], prev: &[u8], i: usize) -> u8 {
-    let left = if i >= 3 { cur[i - 3] } else { 0 };
+fn filtered(kind: u8, cur: &[u8], prev: &[u8], bpp: usize, i: usize) -> u8 {
+    let left = if i >= bpp { cur[i - bpp] } else { 0 };
     let up = prev[i];
-    let up_left = if i >= 3 { prev[i - 3] } else { 0 };
+    let up_left = if i >= bpp { prev[i - bpp] } else { 0 };
     cur[i].wrapping_sub(match kind {
         0 => 0,
         1 => left,
@@ -71,15 +81,15 @@ fn filtered(kind: u8, cur: &[u8], prev: &[u8], i: usize) -> u8 {
 }
 
 /// Pick the filter with the smallest sum of absolute residuals, per row.
-fn filter_row(cur: &[u8], prev: &[u8], out: &mut Vec<u8>) {
+fn filter_row(cur: &[u8], prev: &[u8], bpp: usize, out: &mut Vec<u8>) {
     let cost = |kind: u8| -> u64 {
         (0..cur.len())
-            .map(|i| u64::from((filtered(kind, cur, prev, i) as i8).unsigned_abs()))
+            .map(|i| u64::from((filtered(kind, cur, prev, bpp, i) as i8).unsigned_abs()))
             .sum()
     };
     let best = (0..5u8).min_by_key(|k| cost(*k)).unwrap_or(0);
     out.push(best);
-    out.extend((0..cur.len()).map(|i| filtered(best, cur, prev, i)));
+    out.extend((0..cur.len()).map(|i| filtered(best, cur, prev, bpp, i)));
 }
 
 fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
@@ -153,22 +163,23 @@ mod tests {
             u32::from_be_bytes(ihdr[0..4].try_into().unwrap()),
             u32::from_be_bytes(ihdr[4..8].try_into().unwrap()),
         );
+        let bpp = if ihdr[9] == 6 { 4 } else { 3 };
         let idat: Vec<u8> = cs
             .iter()
             .filter(|(k, _)| k == b"IDAT")
             .flat_map(|(_, d)| d.clone())
             .collect();
         let raw = miniz_oxide::inflate::decompress_to_vec_zlib(&idat).unwrap();
-        let row = w as usize * 3;
+        let row = w as usize * bpp;
         let mut px = vec![0u8; row * h as usize];
         for y in 0..h as usize {
             let f = raw[y * (row + 1)];
             for i in 0..row {
                 let v = raw[y * (row + 1) + 1 + i];
-                let left = if i >= 3 { px[y * row + i - 3] } else { 0 };
+                let left = if i >= bpp { px[y * row + i - bpp] } else { 0 };
                 let up = if y > 0 { px[(y - 1) * row + i] } else { 0 };
-                let up_left = if y > 0 && i >= 3 {
-                    px[(y - 1) * row + i - 3]
+                let up_left = if y > 0 && i >= bpp {
+                    px[(y - 1) * row + i - bpp]
                 } else {
                     0
                 };
@@ -183,6 +194,15 @@ mod tests {
             }
         }
         (w, h, px)
+    }
+
+    #[test]
+    fn rgba_round_trips_with_alpha() {
+        let (w, h) = (19u32, 13u32);
+        let rgba: Vec<u8> = (0..w * h)
+            .flat_map(|i| [(i * 3) as u8, (i * 5) as u8, (i * 7) as u8, (i * 11) as u8])
+            .collect();
+        assert_eq!(decode(&encode_rgba(w, h, &rgba)), (w, h, rgba));
     }
 
     #[test]
@@ -230,6 +250,7 @@ mod tests {
             filter_row(
                 &rgb[y * row..(y + 1) * row],
                 &rgb[(y - 1) * row..y * row],
+                3,
                 &mut out,
             );
             counts[out[0] as usize] += 1;

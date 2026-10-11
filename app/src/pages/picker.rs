@@ -84,21 +84,18 @@ pub fn show(
         .unwrap_or(ButtonAction::Default);
     let cat = st.cat.unwrap_or_else(|| Cat::of(&current));
 
-    ui.horizontal(|ui| {
+    ui.horizontal_top(|ui| {
         let width = (ui.available_width() - 64.0).max(60.0);
-        ui.allocate_ui_with_layout(
-            vec2(width, 22.0),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(format!("Assign an action to {}", b.name)).color(pal.text),
-                    )
-                    .truncate(),
-                );
-            },
-        );
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        ui.allocate_ui_with_layout(vec2(width, 22.0), Layout::top_down(Align::Min), |ui| {
+            ui.set_width(width);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(format!("Assign an action to {}", b.name)).color(pal.text),
+                )
+                .wrap_mode(egui::TextWrapMode::Wrap),
+            );
+        });
+        ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
             if current != ButtonAction::Default
                 && widgets::button(ui, Btn::Ghost, None, "Reset").clicked()
             {

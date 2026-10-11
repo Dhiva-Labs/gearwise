@@ -83,9 +83,10 @@ fn key_at<'a>(g: &KbGeom, layout: &'a KeyboardLayout, p: Pos2) -> Option<&'a Key
 }
 
 pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<Action>) {
-    let Some(layout) = dev.caps.per_key.as_ref() else {
+    if dev.caps.per_key.is_none() {
         return;
-    };
+    }
+    let layout = &*super::kb_preview::board_layout(dev);
     let pal = palette(ui.ctx());
     let id = dev.desc.id.clone();
     let mut painted = std::collections::BTreeMap::new();
@@ -96,8 +97,13 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
         brush_bar(ui, st);
         ui.add_space(8.0);
 
-        let (area, resp) =
-            ui.allocate_exact_size(vec2(ui.available_width(), 300.0), Sense::click_and_drag());
+        let (area, resp) = ui.allocate_exact_size(
+            vec2(
+                ui.available_width(),
+                super::kb_preview::board_height(ui, dev, 260.0),
+            ),
+            Sense::click_and_drag(),
+        );
         let g = illustration::keyboard_geom(area, layout);
         let color_of = |k: u16| dev.state.per_key.get(&k).copied().unwrap_or(Rgb::BLACK);
         let shift = ui.input(|i| i.modifiers.shift);
@@ -181,7 +187,7 @@ pub fn show(ui: &mut Ui, st: &mut PerKeyState, dev: &DeviceView, out: &mut Vec<A
         }
 
         // Rendering (uses the optimistic state plus this frame's strokes).
-        illustration::paint_chassis(ui.painter(), &g, &pal);
+        illustration::paint_chassis(ui.painter(), &g, &pal, None);
         let hovered = ptr
             .filter(|_| resp.hovered() || resp.dragged())
             .and_then(|p| key_at(&g, layout, p))

@@ -2,16 +2,23 @@
 //! tie buttons to the picture.
 
 pub mod callouts;
+mod g502;
+mod g502_shapes;
 pub mod headset;
 pub mod keyboard;
 pub mod mouse;
 mod mouse_paint;
+mod roles;
 pub mod shapes;
 
 use egui::{Pos2, Rect, pos2};
 
-pub use keyboard::{KbGeom, KeyPaint, key_rect, keyboard_geom, paint_chassis, paint_key};
-pub use mouse::{Kind, MouseArt, MouseLook, Role, ZoneRole, art_rect, zone_role};
+pub use keyboard::{
+    KbGeom, KeyPaint, indicator_dots, key_rect, keyboard_geom, paint_chassis, paint_key,
+    paint_zone_outline,
+};
+pub use mouse::{Kind, MouseArt, art_rect};
+pub use roles::{MouseLook, Role, ZoneRole, zone_role};
 
 /// Map a normalised device coordinate (0-1, x left to right, y front to back) onto `rect`.
 pub fn at(rect: Rect, p: (f32, f32)) -> Pos2 {
@@ -54,6 +61,7 @@ mod tests {
                 },
                 |ui| {
                     for kind in [
+                        Kind::G502,
                         Kind::Ergonomic,
                         Kind::ErgoLite,
                         Kind::Ambidextrous,

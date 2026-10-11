@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gearwise
+GenericName=Peripheral configuration
+Comment=Configure Logitech, Razer, Corsair and SteelSeries mice and keyboards
+Exec=gearwise
+Icon=gearwise
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=mouse;keyboard;dpi;rgb;lighting;macros;
+StartupWMClass=gearwise

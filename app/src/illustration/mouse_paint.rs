@@ -17,6 +17,9 @@ use crate::theme::{Palette, mix, with_alpha};
 impl MouseArt {
     /// Paint the whole mouse. `tint` lists parts to light up (hover / selection).
     pub fn paint(&self, p: &Painter, pal: &Palette, look: &MouseLook, tint: &[(Role, f32)]) {
+        if self.kind == Kind::G502 {
+            return super::g502::paint(self, p, pal, look, tint);
+        }
         let skin = Skin::new(pal);
         let g = &self.geo;
         let shape = g.outline();

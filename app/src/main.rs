@@ -9,10 +9,12 @@ mod icons;
 mod illustration;
 mod input;
 mod keymap;
+mod layout;
 mod pages;
 mod persist;
 mod png;
 mod screenshot;
+mod screenshot_demo;
 mod sidebar;
 mod state;
 mod theme;
@@ -32,6 +34,27 @@ fn main() -> eframe::Result {
             "--screenshot" => screenshot_dir = args.next().map(PathBuf::from),
             // Hidden: screenshot the connected hardware (throwaway library).
             "--hw-screenshot" => hw_screenshot_dir = args.next().map(PathBuf::from),
+            // Hidden: write the app icon PNGs (16..512 px) into a directory and exit.
+            "--export-icons" => {
+                let dir = args
+                    .next()
+                    .map_or_else(|| PathBuf::from("packaging/icons"), PathBuf::from);
+                return match icon::export(&dir) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        eprintln!("cannot export icons to {}: {e}", dir.display());
+                        std::process::exit(1)
+                    }
+                };
+            }
+            // Hidden: only run tour steps whose name contains one of these (comma separated).
+            "--only" => {
+                if let Some(list) = args.next() {
+                    screenshot::set_only(&list);
+                }
+            }
+            // Hidden: run the whole screenshot tour in the light theme.
+            "--light" => screenshot::force_light(),
             // Hidden: window size for the screenshot tour, e.g. 1080x680.
             "--size" => {
                 let parsed = args.next().and_then(|v| {

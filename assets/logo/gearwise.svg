@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">Gearwise</title>
+  <!-- Master app icon: a cog whose hollow is a mouse (button seam and scroll wheel), teal on a dark tile. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2432"/>
+      <stop offset="1" stop-color="#0b0f16"/>
+    </linearGradient>
+    <mask id="hollow" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="203.5" y="175.4" width="105" height="161.2" rx="48.6" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#tile)"/>
+  <rect x="1" y="1" width="510" height="510" rx="111" fill="none" stroke="#ffffff" stroke-opacity=".07" stroke-width="2"/>
+  <path d="M225.28 120.32 L240.13 84.48 L271.87 84.48 L286.72 120.32 L330.22 138.34 L366.06 123.49 L388.51 145.94 L373.66 181.78 L391.68 225.28 L427.52 240.13 L427.52 271.87 L391.68 286.72 L373.66 330.22 L388.51 366.06 L366.06 388.51 L330.22 373.66 L286.72 391.68 L271.87 427.52 L240.13 427.52 L225.28 391.68 L181.78 373.66 L145.94 388.51 L123.49 366.06 L138.34 330.22 L120.32 286.72 L84.48 271.87 L84.48 240.13 L120.32 225.28 L138.34 181.78 L123.49 145.94 L145.94 123.49 L181.78 138.34Z" fill="#00d4aa" stroke="#00d4aa" stroke-width="15.4" stroke-linejoin="round" mask="url(#hollow)"/>
+  <rect x="248.3" y="202.3" width="15.4" height="35.8" rx="7.7" fill="#00d4aa"/>
+  <rect x="203.5" y="265" width="105" height="5.5" fill="#00d4aa"/>
+</svg>

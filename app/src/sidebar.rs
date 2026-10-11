@@ -11,6 +11,16 @@ use crate::state::{Action, DeviceView, Route};
 use crate::theme::{Palette, palette, vendor_color, with_alpha};
 use crate::widgets;
 
+const CARD_H: f32 = 62.0;
+const CARD_GAP: f32 = 6.0;
+
+/// Height for the device list: a whole number of cards, so the last visible one is never cut
+/// in half, leaving room below for the library links and the profile switcher.
+fn device_list_height(available: f32) -> f32 {
+    let cards = ((available - 210.0) / (CARD_H + CARD_GAP)).floor().max(1.0);
+    cards * (CARD_H + CARD_GAP) - CARD_GAP
+}
+
 pub struct Nav<'a> {
     pub devices: &'a [DeviceView],
     pub selected: Option<&'a str>,
@@ -31,15 +41,26 @@ pub fn show(ui: &mut Ui, nav: &Nav, out: &mut Vec<Action>) {
             if nav.devices.is_empty() {
                 widgets::caption(ui, "No devices connected");
             }
+            let list_h = device_list_height(ui.available_height());
+            // A short fade only: whole cards fit, so the cue should not eat into the last one.
+            ui.spacing_mut().scroll.fade = egui::style::ScrollFadeStyle {
+                strength: 0.8,
+                size: 10.0,
+            };
             egui::ScrollArea::vertical()
-                .max_height((ui.available_height() - 210.0).max(80.0))
+                .max_height(list_h)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 6.0;
+                    ui.spacing_mut().item_spacing.y = CARD_GAP;
                     for d in nav.devices {
                         let selected =
                             nav.route == Route::Device && nav.selected == Some(d.desc.id.as_str());
-                        if device_card(ui, d, selected, &pal).clicked() {
+                        let resp = device_card(ui, d, selected, &pal).on_hover_text(format!(
+                            "{} {}",
+                            d.desc.vendor.name(),
+                            d.display_name()
+                        ));
+                        if resp.clicked() {
                             out.push(Action::SelectDevice(d.desc.id.clone()));
                         }
                     }
@@ -62,29 +83,15 @@ pub fn show(ui: &mut Ui, nav: &Nav, out: &mut Vec<Action>) {
 
 fn wordmark(ui: &mut Ui, pal: &Palette) {
     ui.horizontal(|ui| {
-        let (rect, _) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::hover());
-        let p = ui.painter();
-        p.rect_filled(rect, CornerRadius::same(9), pal.accent);
-        // A stylised mouse cut-out in the badge.
-        let inner = Rect::from_center_size(rect.center(), vec2(12.0, 18.0));
-        p.rect_stroke(
-            inner,
-            CornerRadius::same(6),
-            Stroke::new(1.8, pal.on_accent),
-            StrokeKind::Middle,
-        );
-        p.vline(
-            rect.center().x,
-            inner.min.y..=inner.min.y + 7.0,
-            Stroke::new(1.5, pal.on_accent),
-        );
+        let (rect, _) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::hover());
+        crate::icon::paint_tile(ui.painter(), &crate::icon::tile_texture(ui.ctx()), rect);
         ui.add_space(2.0);
         widgets::bold(ui, "Gearwise", crate::theme::subtitle(), pal.text);
     });
 }
 
 fn device_card(ui: &mut Ui, d: &DeviceView, selected: bool, pal: &Palette) -> Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 62.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), CARD_H), Sense::click());
     let hot = resp.hovered();
     let p = ui.painter();
     if selected {
@@ -346,4 +353,20 @@ fn profile_switcher(ui: &mut Ui, nav: &Nav, pal: &Palette, out: &mut Vec<Action>
         }
     });
     ui.add_space(8.0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_device_list_shows_whole_cards() {
+        for avail in [300.0, 400.0, 517.0, 640.0, 900.0] {
+            let h = device_list_height(avail);
+            let cards = (h + CARD_GAP) / (CARD_H + CARD_GAP);
+            assert!((cards - cards.round()).abs() < 1e-3, "{avail}: {h}");
+            assert!(cards >= 1.0);
+            assert!(h <= (avail - 210.0).max(CARD_H) + 1e-3);
+        }
+    }
 }

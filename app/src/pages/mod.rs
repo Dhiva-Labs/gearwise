@@ -5,6 +5,7 @@ pub mod assignments;
 pub mod device;
 pub mod empty;
 pub mod info;
+pub mod kb_preview;
 pub mod lighting;
 pub mod macros;
 pub mod per_key;
@@ -71,7 +72,7 @@ mod tests {
         assert_eq!(action_label(&ButtonAction::Disabled, &lib), "Disabled");
     }
 
-    /// The three demo devices plus the extra silhouettes (G502 HERO, slim, MMO, DeathAdder, headset).
+    /// The three demo devices plus the extras (G502 HERO, slim, MMO, DeathAdder, K55, headset).
     fn demo_views() -> Vec<DeviceView> {
         let demo = gearwise_core::demo::devices().into_iter().map(|mut d| {
             let state = d.read_state().unwrap();
@@ -82,7 +83,7 @@ mod tests {
             })
         });
         demo.chain(
-            crate::screenshot::extra_devices()
+            crate::screenshot_demo::extra_devices()
                 .into_iter()
                 .map(DeviceView::new),
         )
@@ -177,7 +178,7 @@ mod tests {
     fn every_device_tab_survives_random_clicking() {
         let lib = Library::starter();
         for seed in 1..=2u64 {
-            for idx in 0..8 {
+            for idx in 0..demo_views().len() {
                 let mut views = demo_views();
                 let tabs = views[idx].tabs();
                 for tab in tabs {

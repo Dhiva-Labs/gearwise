@@ -9,7 +9,6 @@ use egui::{
     TextEdit, Ui, pos2, vec2,
 };
 use gearwise_core::device::Setting;
-use gearwise_core::keys::KeyboardLayout;
 use gearwise_core::model::{
     DeviceKind, EffectKind, LightingEffect, LightingZoneCaps, Rgb, WaveDirection, ZoneState,
 };
@@ -132,31 +131,48 @@ pub fn show(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Ac
         st.mode = LightMode::PerKey;
     }
 
-    ui.horizontal(|ui| {
-        if has_effects && st.mode == LightMode::Effects && zones.len() > 1 {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            widgets::muted(ui, "Zone");
-            if widgets::pill(ui, "All zones", st.zone == ALL_ZONES).clicked() {
-                st.zone = ALL_ZONES;
-            }
-            for z in zones {
-                if widgets::pill(ui, &z.name, z.id == st.zone).clicked() {
-                    st.zone = z.id;
-                }
+    let show_zones = has_effects && st.mode == LightMode::Effects && zones.len() > 1;
+    let switch = has_effects && has_per_key;
+    // With many zones there is no room beside the mode switch: it gets a row of its own, and
+    // the zone chips wrap instead of running past the card.
+    let own_row = switch && show_zones && zones.len() >= 5;
+    let mode_switch = |ui: &mut Ui, st: &mut LightState| {
+        let items = [
+            Seg::new(LightMode::Effects, "Effects"),
+            Seg::new(LightMode::PerKey, "Per-key"),
+        ];
+        if let Some(m) = widgets::segmented(ui, st.mode, &items) {
+            st.mode = m;
+        }
+    };
+    let zone_chips = |ui: &mut Ui, st: &mut LightState| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        widgets::muted(ui, "Zone");
+        if widgets::pill(ui, "All zones", st.zone == ALL_ZONES).clicked() {
+            st.zone = ALL_ZONES;
+        }
+        for z in zones {
+            if widgets::pill(ui, &z.name, z.id == st.zone).clicked() {
+                st.zone = z.id;
             }
         }
-        if has_effects && has_per_key {
+    };
+    if own_row {
+        ui.horizontal(|ui| mode_switch(ui, st));
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| zone_chips(ui, st));
+    } else if switch {
+        ui.horizontal(|ui| {
+            if show_zones {
+                zone_chips(ui, st);
+            }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let items = [
-                    Seg::new(LightMode::Effects, "Effects"),
-                    Seg::new(LightMode::PerKey, "Per-key"),
-                ];
-                if let Some(m) = widgets::segmented(ui, st.mode, &items) {
-                    st.mode = m;
-                }
+                mode_switch(ui, st)
             });
-        }
-    });
+        });
+    } else if show_zones {
+        ui.horizontal_wrapped(|ui| zone_chips(ui, st));
+    }
     ui.add_space(12.0);
 
     match st.mode {
@@ -165,7 +181,7 @@ pub fn show(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Ac
     }
 }
 
-fn zone_state(dev: &DeviceView, id: u8) -> ZoneState {
+pub(super) fn zone_state(dev: &DeviceView, id: u8) -> ZoneState {
     dev.state.lighting.get(&id).copied().unwrap_or(ZoneState {
         effect: LightingEffect::Off,
         brightness: 100,
@@ -224,7 +240,8 @@ fn effects(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Act
         // A keyboard preview needs the full width: preview on top, controls below.
         widgets::card(ui, |ui| {
             ui.set_width(ui.available_width());
-            preview(ui, dev, zone, t, 250.0);
+            let h = super::kb_preview::board_height(ui, dev, 250.0);
+            preview(ui, dev, zone, t, h);
         });
         ui.add_space(14.0);
         widgets::card(ui, |ui| {
@@ -237,7 +254,7 @@ fn effects(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Act
         widgets::card_columns(
             ui,
             0.46,
-            |ui| preview(ui, dev, zone, t, 400.0),
+            |ui| preview(ui, dev, zone, t, mouse_preview_height(ui)),
             |ui| {
                 controls(
                     ui,
@@ -276,6 +293,12 @@ fn effects(ui: &mut Ui, st: &mut LightState, dev: &DeviceView, out: &mut Vec<Act
 
 // --- Preview ---------------------------------------------------------------------
 
+/// Height for a mouse or headset preview: the art fits what the window leaves below the zone
+/// pills, so the whole device is visible without scrolling.
+fn mouse_preview_height(ui: &Ui) -> f32 {
+    (widgets::viewport_height(ui) - 150.0).clamp(280.0, 460.0)
+}
+
 fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, height: f32) {
     let pal = palette(ui.ctx());
     widgets::subtitle(ui, "Live preview");
@@ -304,7 +327,9 @@ fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, h
         }
     }
     match dev.desc.kind {
-        DeviceKind::Keyboard => keyboard_preview(ui, area, dev, selected, t, &pal),
+        DeviceKind::Keyboard => {
+            super::kb_preview::keyboard_preview(ui, area, dev, selected, t, &pal)
+        }
         DeviceKind::Headset => paint_headset(ui.painter(), area.shrink(10.0), &pal, &look),
         _ => {
             let kind = Kind::for_name(dev.display_name());
@@ -319,161 +344,6 @@ fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, h
             ui,
             format!("{} · {}", selected.name, zs.effect.kind().name()),
         );
-    }
-}
-
-/// Zones that each light a vertical slice of the keys, left to right
-/// ("Zone 1" … "Zone 5" on boards like the K55).
-fn key_slices(zones: &[LightingZoneCaps]) -> Vec<&LightingZoneCaps> {
-    let slices: Vec<&LightingZoneCaps> = zones
-        .iter()
-        .filter(|z| z.name.to_ascii_lowercase().starts_with("zone "))
-        .collect();
-    if slices.len() >= 2 {
-        slices
-    } else {
-        Vec::new()
-    }
-}
-
-/// Layout to draw when the device doesn't report one.
-fn fallback_layout(name: &str) -> KeyboardLayout {
-    let n = name.to_ascii_lowercase();
-    let compact = ["tkl", "tenkeyless", "mini", "60", "65", "75"]
-        .iter()
-        .any(|w| n.contains(w));
-    if compact {
-        gearwise_core::keys::ansi_tkl()
-    } else {
-        gearwise_core::keys::ansi_full()
-    }
-}
-
-fn keyboard_preview(
-    ui: &mut Ui,
-    area: Rect,
-    dev: &DeviceView,
-    selected: &LightingZoneCaps,
-    t: f32,
-    pal: &Palette,
-) {
-    let default_layout = fallback_layout(dev.display_name());
-    let layout: &KeyboardLayout = dev.caps.per_key.as_ref().unwrap_or(&default_layout);
-    let g = illustration::keyboard_geom(area, layout);
-    let zones = &dev.caps.lighting;
-    let slices = key_slices(zones);
-    // The zone that colours the keys (unless slices do); any other zone glows
-    // around the chassis.
-    let key_zone = if slices.is_empty() {
-        zones
-            .iter()
-            .find(|z| z.name.to_ascii_lowercase().contains("key"))
-            .or(zones.first())
-    } else {
-        None
-    };
-    for z in zones
-        .iter()
-        .filter(|z| Some(z.id) != key_zone.map(|k| k.id) && !slices.iter().any(|s| s.id == z.id))
-    {
-        let zs = zone_state(dev, z.id);
-        if zs.effect == LightingEffect::Off {
-            continue;
-        }
-        let c = c32(fx::sample(
-            &zs.effect,
-            zs.brightness,
-            t,
-            0.5,
-            u32::from(z.id),
-        ));
-        for (w, a) in [(30.0, 16u8), (20.0, 30), (12.0, 56), (5.0, 120)] {
-            ui.painter().rect_stroke(
-                g.chassis.expand(w * 0.35),
-                CornerRadius::same((g.unit * 0.5) as u8),
-                Stroke::new(w, with_alpha(c, a)),
-                StrokeKind::Middle,
-            );
-        }
-    }
-    illustration::paint_chassis(ui.painter(), &g, pal);
-    let width = layout.width().max(1.0);
-    let key_state = key_zone.map(|z| zone_state(dev, z.id));
-    let slice_of = |cell: &gearwise_core::keys::KeyCell| -> Option<&LightingZoneCaps> {
-        let x = (cell.x + cell.w / 2.0) / width;
-        slices
-            .get(((x * slices.len() as f32) as usize).min(slices.len().saturating_sub(1)))
-            .copied()
-    };
-    for cell in &layout.keys {
-        let zs = match slice_of(cell) {
-            Some(z) => Some(zone_state(dev, z.id)),
-            None => key_state,
-        };
-        let color = zs.map_or(Color32::BLACK, |zs| {
-            c32(fx::sample(
-                &zs.effect,
-                zs.brightness,
-                t,
-                (cell.x + cell.w / 2.0) / width,
-                u32::from(cell.id),
-            ))
-        });
-        let lit = color != Color32::BLACK;
-        let paint = illustration::KeyPaint {
-            fill: if lit {
-                color
-            } else {
-                mix(pal.card, pal.raised, 0.6)
-            },
-            label: if lit {
-                text_on(color)
-            } else {
-                with_alpha(pal.muted, 160)
-            },
-            stroke: Stroke::new(
-                1.0,
-                if lit {
-                    with_alpha(Color32::BLACK, 70)
-                } else {
-                    with_alpha(pal.border, 200)
-                },
-            ),
-            glow: lit.then_some(color),
-        };
-        illustration::paint_key(
-            ui.painter(),
-            illustration::key_rect(&g, cell),
-            &cell.label,
-            paint,
-            g.unit,
-        );
-    }
-    let whole = selected.id == ALL_ZONES || key_zone.is_some_and(|k| k.id == selected.id);
-    if whole {
-        ui.painter().rect_stroke(
-            g.chassis.expand(3.0),
-            CornerRadius::same((g.unit * 0.4) as u8),
-            Stroke::new(1.5, pal.accent),
-            StrokeKind::Outside,
-        );
-    } else if let Some(i) = slices.iter().position(|z| z.id == selected.id) {
-        // Outline the keys this zone lights.
-        let in_slice: Vec<Rect> = layout
-            .keys
-            .iter()
-            .filter(|c| slice_of(c).is_some_and(|z| z.id == slices[i].id))
-            .map(|c| illustration::key_rect(&g, c))
-            .collect();
-        if let Some(first) = in_slice.first() {
-            let bounds = in_slice.iter().fold(*first, |r, k| r.union(*k));
-            ui.painter().rect_stroke(
-                bounds.expand(3.0),
-                CornerRadius::same((g.unit * 0.25) as u8),
-                Stroke::new(1.5, pal.accent),
-                StrokeKind::Outside,
-            );
-        }
     }
 }
 
@@ -690,92 +560,4 @@ fn effect_tile(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn colour_edits_only_touch_effects_that_have_a_colour() {
-        let red = Rgb::new(255, 0, 0);
-        assert_eq!(
-            with_color(LightingEffect::Static { color: Rgb::BLACK }, red),
-            LightingEffect::Static { color: red }
-        );
-        assert_eq!(
-            with_color(
-                LightingEffect::Breathing {
-                    color: Rgb::BLACK,
-                    period_ms: 900
-                },
-                red
-            ),
-            LightingEffect::Breathing {
-                color: red,
-                period_ms: 900
-            }
-        );
-        assert_eq!(
-            with_color(LightingEffect::ColorCycle { period_ms: 5 }, red),
-            LightingEffect::ColorCycle { period_ms: 5 }
-        );
-    }
-
-    #[test]
-    fn period_edits_keep_other_fields() {
-        let c = Rgb::new(1, 2, 3);
-        assert_eq!(
-            with_period(
-                LightingEffect::Reactive {
-                    color: c,
-                    duration_ms: 1
-                },
-                700
-            ),
-            LightingEffect::Reactive {
-                color: c,
-                duration_ms: 700
-            }
-        );
-        assert_eq!(
-            with_period(
-                LightingEffect::Wave {
-                    period_ms: 1,
-                    direction: WaveDirection::RightToLeft
-                },
-                9000
-            ),
-            LightingEffect::Wave {
-                period_ms: 9000,
-                direction: WaveDirection::RightToLeft
-            }
-        );
-        assert_eq!(with_period(LightingEffect::Off, 10), LightingEffect::Off);
-    }
-
-    #[test]
-    fn direction_applies_to_waves_only() {
-        let w = LightingEffect::Wave {
-            period_ms: 3000,
-            direction: WaveDirection::LeftToRight,
-        };
-        assert_eq!(
-            with_direction(w, WaveDirection::RightToLeft),
-            LightingEffect::Wave {
-                period_ms: 3000,
-                direction: WaveDirection::RightToLeft
-            }
-        );
-        assert_eq!(
-            with_direction(LightingEffect::Off, WaveDirection::RightToLeft),
-            LightingEffect::Off
-        );
-    }
-
-    #[test]
-    fn label_ink_contrasts_with_the_key() {
-        assert_eq!(text_on(Color32::WHITE), Color32::from_rgb(0x12, 0x15, 0x1b));
-        assert_eq!(
-            text_on(Color32::from_rgb(10, 10, 40)),
-            Color32::from_rgb(0xf2, 0xf4, 0xf8)
-        );
-    }
-}
+mod tests;

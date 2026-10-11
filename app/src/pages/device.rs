@@ -1,6 +1,6 @@
 //! Device page: header, onboard profile slots and the capability-driven tabs.
 
-use egui::{Align, Layout, RichText, ScrollArea, Ui, vec2};
+use egui::{Align, Layout, RichText, Ui, vec2};
 use gearwise_core::profile::Library;
 
 use super::PageStates;
@@ -56,56 +56,65 @@ pub fn show(
         ui.horizontal(|ui| onboard_slots(ui, dev, out));
     }
     ui.add_space(12.0);
-    ScrollArea::vertical()
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            match *tab {
-                Tab::Assignments => {
-                    super::assignments::show(ui, &mut st.assign, dev, lib, keys, out)
-                }
-                Tab::Sensitivity => super::sensitivity::show(ui, &mut st.sens, dev, out),
-                Tab::Lighting => super::lighting::show(ui, &mut st.light, dev, out),
-                Tab::Performance => super::performance::show(ui, dev, out),
-                Tab::Info => super::info::show(ui, dev),
-            }
-            ui.add_space(24.0);
-        });
+    widgets::page_scroll(ui, |ui| match *tab {
+        Tab::Assignments => super::assignments::show(ui, &mut st.assign, dev, lib, keys, out),
+        Tab::Sensitivity => super::sensitivity::show(ui, &mut st.sens, dev, out),
+        Tab::Lighting => super::lighting::show(ui, &mut st.light, dev, out),
+        Tab::Performance => super::performance::show(ui, dev, out),
+        Tab::Info => super::info::show(ui, dev),
+    });
 }
 
 fn header(ui: &mut Ui, dev: &DeviceView, out: &mut Vec<Action>) {
     let pal = palette(ui.ctx());
     let vc = vendor_color(dev.desc.vendor);
+    // The buttons on the right keep their room; the name and details give way to them.
+    let right_w = 292.0
+        + if dev.state.battery.is_some() {
+            96.0
+        } else {
+            0.0
+        };
+    let left_w = (ui.available_width() - right_w - ui.spacing().item_spacing.x).max(160.0);
     ui.horizontal(|ui| {
-        let (rect, _) = ui.allocate_exact_size(vec2(56.0, 56.0), egui::Sense::hover());
-        ui.painter()
-            .rect_filled(rect, egui::CornerRadius::same(14), with_alpha(vc, 30));
-        icons::paint(
-            ui.painter(),
-            icons::square(rect.center(), 30.0),
-            Icon::of(dev.desc.kind),
-            vc,
+        ui.allocate_ui_with_layout(
+            vec2(left_w, 56.0),
+            Layout::left_to_right(Align::Center),
+            |ui| {
+                let (rect, _) = ui.allocate_exact_size(vec2(56.0, 56.0), egui::Sense::hover());
+                ui.painter()
+                    .rect_filled(rect, egui::CornerRadius::same(14), with_alpha(vc, 30));
+                icons::paint(
+                    ui.painter(),
+                    icons::square(rect.center(), 30.0),
+                    Icon::of(dev.desc.kind),
+                    vc,
+                );
+                ui.add_space(4.0);
+                let text_w = (left_w - 64.0).max(100.0);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 6.0;
+                    ui.set_max_width(text_w);
+                    widgets::title_fit(ui, dev.display_name(), text_w);
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 8.0;
+                        widgets::badge(ui, dev.desc.vendor.name(), vc);
+                        if dev.desc.simulated {
+                            widgets::badge(ui, "Demo", pal.muted);
+                        }
+                        let mut info =
+                            format!("{} · {}", dev.desc.kind.name(), dev.desc.connection.name());
+                        if let Some(fw) = &dev.desc.firmware {
+                            info.push_str(&format!(" · Firmware {fw}"));
+                        }
+                        if !dev.online {
+                            info.push_str(" · Asleep");
+                        }
+                        ui.add(egui::Label::new(RichText::new(info).color(pal.muted)).truncate());
+                    });
+                });
+            },
         );
-        ui.add_space(4.0);
-        ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 6.0;
-            widgets::title(ui, dev.display_name());
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                widgets::badge(ui, dev.desc.vendor.name(), vc);
-                if dev.desc.simulated {
-                    widgets::badge(ui, "Demo", pal.muted);
-                }
-                let mut info = format!("{} · {}", dev.desc.kind.name(), dev.desc.connection.name());
-                if let Some(fw) = &dev.desc.firmware {
-                    info.push_str(&format!(" · Firmware {fw}"));
-                }
-                if !dev.online {
-                    info.push_str(" · Asleep");
-                }
-                widgets::muted(ui, info);
-            });
-        });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if widgets::primary(ui, Some(Icon::Save), "Save to device")
                 .on_hover_text("Write the current settings to the device's memory")

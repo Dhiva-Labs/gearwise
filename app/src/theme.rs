@@ -231,7 +231,25 @@ pub fn apply(ctx: &Context, pal: &Palette) {
     sp.slider_rail_height = 6.0;
     sp.combo_width = 160.0;
     sp.text_edit_width = 200.0;
-    sp.scroll = egui::style::ScrollStyle::floating();
+    // A thin bar that stays visible (so long pages read as scrollable), plus a fading edge.
+    sp.scroll = egui::style::ScrollStyle {
+        floating: true,
+        bar_width: 9.0,
+        floating_width: 4.0,
+        floating_allocated_width: 8.0,
+        foreground_color: true,
+        dormant_background_opacity: 0.0,
+        active_background_opacity: 0.0,
+        interact_background_opacity: 0.1,
+        dormant_handle_opacity: 0.32,
+        active_handle_opacity: 0.55,
+        interact_handle_opacity: 0.9,
+        fade: egui::style::ScrollFadeStyle {
+            strength: 0.95,
+            size: 26.0,
+        },
+        ..egui::style::ScrollStyle::floating()
+    };
     sp.menu_margin = egui::Margin::same(6);
     sp.window_margin = egui::Margin::same(16);
     style.animation_time = 0.12;

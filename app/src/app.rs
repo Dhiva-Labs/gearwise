@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use egui::{
-    Align, Color32, Context, CornerRadius, Frame, Layout, Margin, Panel, RichText, ScrollArea,
-    Stroke, Ui,
+    Align, Color32, Context, CornerRadius, Frame, Layout, Margin, Panel, RichText, Stroke, Ui,
 };
 use gearwise_core::ScanIssue;
 use gearwise_core::device::Setting;
@@ -643,15 +642,7 @@ impl App {
 
     fn central(&mut self, ui: &mut Ui, pal: &Palette, out: &mut Vec<Action>) {
         self.banner(ui, pal, out);
-        let scroll = |ui: &mut Ui, add: &mut dyn FnMut(&mut Ui)| {
-            ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    add(ui);
-                    ui.add_space(24.0);
-                });
-        };
+        let scroll = |ui: &mut Ui, add: &mut dyn FnMut(&mut Ui)| widgets::page_scroll(ui, add);
         match self.route {
             Route::Device => match self.current_device() {
                 Some(i) => pages::device::show(
@@ -728,11 +719,13 @@ impl eframe::App for App {
             )
             .show(ui, |ui| sidebar::show(ui, &nav, &mut out));
         egui::CentralPanel::default()
-            .frame(
-                Frame::new()
-                    .fill(pal.window)
-                    .inner_margin(Margin::symmetric(28, 18)),
-            )
+            // No bottom margin: pages scroll all the way to the window's edge.
+            .frame(Frame::new().fill(pal.window).inner_margin(Margin {
+                left: 28,
+                right: 18,
+                top: 18,
+                bottom: 0,
+            }))
             .show(ui, |ui| self.central(ui, &pal, &mut out));
         self.toasts.show(&ctx);
 

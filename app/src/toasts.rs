@@ -10,7 +10,7 @@ use crate::icons::{self, Icon};
 use crate::state::ToastKind;
 use crate::theme::{palette, with_alpha};
 
-const LIFETIME: Duration = Duration::from_millis(4200);
+const LIFETIME: Duration = Duration::from_millis(3600);
 const FADE: Duration = Duration::from_millis(500);
 const MAX_VISIBLE: usize = 4;
 
@@ -40,6 +40,11 @@ impl Toasts {
         }
     }
 
+    /// Drop every toast (the screenshot tour starts each view clean).
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
     #[cfg(test)]
     pub fn texts(&self) -> Vec<(ToastKind, String)> {
         self.items
@@ -59,7 +64,7 @@ impl Toasts {
         let mut next_wake = LIFETIME;
         Area::new(Id::new("toasts"))
             .order(Order::Tooltip)
-            .anchor(Align2::RIGHT_BOTTOM, vec2(-20.0, -20.0))
+            .anchor(Align2::RIGHT_BOTTOM, vec2(-16.0, -16.0))
             .show(ctx, |ui| {
                 ui.spacing_mut().item_spacing.y = 8.0;
                 for (i, t) in self.items.iter().enumerate() {
@@ -82,7 +87,7 @@ impl Toasts {
                             .fill(pal.raised)
                             .stroke(Stroke::new(1.0, with_alpha(accent, 140)))
                             .corner_radius(CornerRadius::same(10))
-                            .inner_margin(Margin::symmetric(14, 10))
+                            .inner_margin(Margin::symmetric(12, 8))
                             .shadow(egui::Shadow {
                                 offset: [0, 6],
                                 blur: 18,
@@ -90,10 +95,16 @@ impl Toasts {
                                 color: egui::Color32::from_black_alpha(90),
                             })
                             .show(ui, |ui| {
-                                ui.set_max_width(360.0);
+                                ui.set_max_width(300.0);
                                 ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 8.0;
                                     icons::show(ui, icon, 16.0, accent);
-                                    ui.label(RichText::new(&t.text).color(pal.text));
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(&t.text).size(13.0).color(pal.text),
+                                        )
+                                        .wrap_mode(egui::TextWrapMode::Wrap),
+                                    );
                                 });
                             })
                             .response;

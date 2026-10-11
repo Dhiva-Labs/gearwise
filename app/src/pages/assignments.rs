@@ -1,11 +1,10 @@
 //! Assignments tab: device art with clickable hotspots, the button list and the action picker.
 
 use egui::{
-    Align, CornerRadius, FontId, Frame, Layout, Margin, Rect, Sense, Stroke, StrokeKind, Ui, pos2,
-    vec2,
+    Align, CornerRadius, FontId, Frame, Layout, Margin, Pos2, Rect, Sense, Stroke, StrokeKind, Ui,
+    pos2, vec2,
 };
 use gearwise_core::device::Setting;
-use gearwise_core::keys::{self, KeyboardLayout};
 use gearwise_core::model::{ButtonAction, ButtonCaps, DeviceKind};
 use gearwise_core::profile::Library;
 
@@ -134,19 +133,85 @@ fn illustration_panel(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: 
     }
 }
 
+/// Label text and side for every placed button.
+fn callout_items(
+    art: &MouseArt,
+    placed: &[illustration::mouse::Placement],
+    dev: &DeviceView,
+    lib: &Library,
+) -> Vec<Callout> {
+    placed
+        .iter()
+        .filter_map(|pl| {
+            let b = dev.caps.buttons.iter().find(|b| b.id == pl.id)?;
+            let action = action_of(dev, b);
+            let custom = action != ButtonAction::Default;
+            Some(Callout {
+                id: b.id,
+                anchor: pl.anchor,
+                side: callouts::side_for(pl.role, pl.anchor, art.rect),
+                title: b.name.clone(),
+                detail: if !b.remappable {
+                    "Fixed".to_string()
+                } else if custom {
+                    action_label(&action, lib)
+                } else {
+                    "Default".to_string()
+                },
+                custom,
+                enabled: b.remappable,
+                compact: matches!(pl.role, Some(illustration::Role::Grid(_))),
+            })
+        })
+        .collect()
+}
+
+/// Widest a label pill may get before its text is cut with an ellipsis.
+const MAX_PILL_W: f32 = 230.0;
+/// Narrowest the device art is allowed to get before the pills give way instead.
+const MIN_ART_W: f32 = 150.0;
+
 fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library) {
     let pal = palette(ui.ctx());
     let kind = Kind::for_name(dev.display_name());
-    let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), 450.0), Sense::hover());
 
-    // Size the mouse first, then give the labels what is left on each side.
-    let mut width = (area.height() - 30.0).min(410.0) * kind.aspect();
-    let pill_w = ((area.width() - width - 64.0) / 2.0).clamp(112.0, 184.0);
-    width = width.min(area.width() - 2.0 * pill_w - 64.0).max(120.0);
-    let rect = Rect::from_center_size(area.center(), vec2(width, width / kind.aspect()));
+    // Which labels go where does not depend on the size, so measure them on a probe first.
+    let probe = MouseArt::new(
+        illustration::art_rect(Rect::from_min_size(Pos2::ZERO, vec2(200.0, 400.0)), kind),
+        kind,
+    );
+    let probe_items = callout_items(&probe, &probe.place(&dev.caps.buttons), dev, lib);
+    let per_side = |side| {
+        probe_items
+            .iter()
+            .filter(|c| c.side == side && !c.compact)
+            .count()
+    };
+    let crowded = per_side(callouts::Side::Left).max(per_side(callouts::Side::Right));
+
+    // The art fills the viewport's height (never overflowing it) and its labels take the
+    // width they need; only when the art would get tiny do the labels give way.
+    let budget = (widgets::viewport_height(ui) - 44.0).clamp(300.0, 580.0);
+    let height = budget.max(callouts::height_needed(crowded));
+    let (area, _) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
+    let (mut lw, mut rw) = callouts::column_widths(ui.painter(), &probe_items, MAX_PILL_W);
+    let lead = 2.0 * callouts::LEAD;
+    if area.width() - lead - lw - rw < MIN_ART_W {
+        let each = ((area.width() - lead - MIN_ART_W) / 2.0).max(104.0);
+        (lw, rw) = (lw.min(each), rw.min(each));
+    }
+    let free = Rect::from_min_size(
+        area.min,
+        vec2((area.width() - lead - lw - rw).max(100.0), area.height()),
+    );
+    let mut rect = illustration::art_rect(free.shrink2(vec2(0.0, 6.0)), kind);
+    // Centre label columns and art as one group.
+    let group = lw + callouts::LEAD + rect.width() + callouts::LEAD + rw;
+    let left = area.min.x + (area.width() - group).max(0.0) / 2.0 + lw + callouts::LEAD;
+    rect = rect.translate(vec2(left - rect.min.x, 0.0));
+
     let art = MouseArt::new(rect, kind);
     let placed = art.place(&dev.caps.buttons);
-
     let tint: Vec<_> = placed
         .iter()
         .filter_map(|pl| {
@@ -163,31 +228,17 @@ fn mouse_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Library)
         .collect();
     art.paint(ui.painter(), &pal, &MouseLook::default(), &tint);
 
-    let items: Vec<Callout> = placed
-        .iter()
-        .filter_map(|pl| {
-            let b = dev.caps.buttons.iter().find(|b| b.id == pl.id)?;
-            let action = action_of(dev, b);
-            let custom = action != ButtonAction::Default;
-            Some(Callout {
-                id: b.id,
-                anchor: pl.anchor,
-                side: callouts::side_for(pl.role, pl.anchor, rect.center().x),
-                title: b.name.clone(),
-                detail: if !b.remappable {
-                    "Fixed".to_string()
-                } else if custom {
-                    action_label(&action, lib)
-                } else {
-                    "Default".to_string()
-                },
-                custom,
-                enabled: b.remappable,
-                compact: matches!(pl.role, Some(illustration::Role::Grid(_))),
-            })
-        })
-        .collect();
-    let hit = callouts::show(ui, area, pill_w, &items, st.selected, st.hover_seen, &pal);
+    let items = callout_items(&art, &placed, dev, lib);
+    let hit = callouts::show(
+        ui,
+        area,
+        rect,
+        (lw, rw),
+        &items,
+        st.selected,
+        st.hover_seen,
+        &pal,
+    );
     if hit.hovered.is_some() {
         st.hover_now = hit.hovered;
     }
@@ -212,20 +263,21 @@ fn keyboard_art(ui: &mut Ui, st: &mut AssignState, dev: &DeviceView, lib: &Libra
         .caps
         .buttons
         .iter()
-        .filter(|b| {
-            b.hotspot.is_none() && !dev.caps.per_key.as_ref().is_some_and(|l| l.contains(b.id))
-        })
+        .filter(|b| b.hotspot.is_none() && !super::kb_preview::board_layout(dev).contains(b.id))
         .collect();
     let extra_h = if extras.is_empty() { 0.0 } else { 70.0 };
-    let (area, _) =
-        ui.allocate_exact_size(vec2(ui.available_width(), 300.0 + extra_h), Sense::hover());
+    let board_h = super::kb_preview::board_height(ui, dev, 150.0 + extra_h);
+    let (area, _) = ui.allocate_exact_size(
+        vec2(ui.available_width(), board_h + extra_h),
+        Sense::hover(),
+    );
     let id = ui.id().with("art");
     let mut hovered: Option<(Rect, String)> = None;
 
-    let layout: KeyboardLayout = dev.caps.per_key.clone().unwrap_or_else(keys::ansi_tkl);
+    let layout = super::kb_preview::board_layout(dev);
     let kb_area = Rect::from_min_max(area.min, pos2(area.max.x, area.max.y - extra_h));
     let g = illustration::keyboard_geom(kb_area.shrink(4.0), &layout);
-    illustration::paint_chassis(ui.painter(), &g, &pal);
+    illustration::paint_chassis(ui.painter(), &g, &pal, None);
     for cell in &layout.keys {
         let r = illustration::key_rect(&g, cell);
         match dev
@@ -389,13 +441,6 @@ fn button_list(
             p.rect_filled(rect, CornerRadius::same(9), pal.raised);
         }
         let name_color = if b.remappable { pal.text } else { pal.muted };
-        let max_name = rect.width() * 0.5 - 16.0;
-        let g = widgets::fit_text(p, &b.name, FontId::proportional(14.0), name_color, max_name);
-        p.galley(
-            pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0),
-            g,
-            name_color,
-        );
         let (label, color) = if !b.remappable {
             ("Fixed".to_string(), pal.muted)
         } else if action == ButtonAction::Default {
@@ -403,13 +448,24 @@ fn button_list(
         } else {
             (action_label(&action, lib), pal.accent_text())
         };
-        let g = widgets::fit_text(
-            p,
-            &label,
-            FontId::proportional(13.0),
-            color,
-            rect.width() * 0.5 - 14.0,
+        // Both texts get what they need; only when they cannot share the row is one shortened.
+        let natural = |text: &str, size: f32| {
+            p.layout_no_wrap(text.to_string(), FontId::proportional(size), name_color)
+                .size()
+                .x
+        };
+        let (name_w, label_w) = split_widths(
+            natural(&b.name, 14.0),
+            natural(&label, 13.0),
+            rect.width() - 24.0 - 12.0,
         );
+        let g = widgets::fit_text(p, &b.name, FontId::proportional(14.0), name_color, name_w);
+        p.galley(
+            pos2(rect.min.x + 12.0, rect.center().y - g.size().y / 2.0),
+            g,
+            name_color,
+        );
+        let g = widgets::fit_text(p, &label, FontId::proportional(13.0), color, label_w);
         p.galley(
             pos2(
                 rect.max.x - 12.0 - g.size().x,
@@ -439,6 +495,20 @@ fn button_list(
     }
 }
 
+/// Split a row between a name and an action label: each gets its natural width when both
+/// fit, otherwise the longer one gives way (neither drops below half unless it needs less).
+fn split_widths(name: f32, label: f32, avail: f32) -> (f32, f32) {
+    if name + label <= avail {
+        (name, label)
+    } else if name <= avail * 0.5 {
+        (name, avail - name)
+    } else if label <= avail * 0.5 {
+        (avail - label, label)
+    } else {
+        (avail * 0.5, avail * 0.5)
+    }
+}
+
 /// Apply `action` to the button.
 pub fn assign(dev: &DeviceView, b: &ButtonCaps, action: ButtonAction, out: &mut Vec<Action>) {
     out.push(Action::Apply {
@@ -446,4 +516,18 @@ pub fn assign(dev: &DeviceView, b: &ButtonCaps, action: ButtonAction, out: &mut 
         setting: Setting::Button { id: b.id, action },
         debounce: false,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_widths;
+
+    #[test]
+    fn rows_share_width_by_need() {
+        assert_eq!(split_widths(100.0, 80.0, 300.0), (100.0, 80.0));
+        // The short name keeps its width; the long label takes the rest.
+        assert_eq!(split_widths(60.0, 400.0, 300.0), (60.0, 240.0));
+        assert_eq!(split_widths(400.0, 60.0, 300.0), (240.0, 60.0));
+        assert_eq!(split_widths(400.0, 400.0, 300.0), (150.0, 150.0));
+    }
 }

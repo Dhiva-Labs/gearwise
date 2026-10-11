@@ -4,115 +4,19 @@
 
 use std::f32::consts::PI;
 
-use egui::{Color32, Pos2, Rect, pos2, vec2};
-use gearwise_core::model::{ButtonAction, ButtonCaps, DpiFunction, MouseButton};
+use egui::{Pos2, Rect, pos2, vec2};
+use gearwise_core::model::ButtonCaps;
 
+use super::g502_shapes;
+pub use super::roles::{MouseLook, Role, ZoneRole};
 use super::shapes::{centroid, rot_rrect, rounded_poly};
-
-/// Which part of the device a lighting zone lights.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ZoneRole {
-    Logo,
-    Wheel,
-    Body,
-}
-
-pub fn zone_role(name: &str) -> ZoneRole {
-    let n = name.to_ascii_lowercase();
-    if n.contains("logo") {
-        ZoneRole::Logo
-    } else if n.contains("scroll") || n.contains("wheel") {
-        ZoneRole::Wheel
-    } else {
-        ZoneRole::Body
-    }
-}
-
-/// Colours a lighting preview paints on the mouse, per role.
-#[derive(Clone, Copy, Default)]
-pub struct MouseLook {
-    pub logo: Option<Color32>,
-    pub wheel: Option<Color32>,
-    pub body: Option<Color32>,
-    pub highlight: Option<ZoneRole>,
-}
-
-/// What a button is, anatomically.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Role {
-    Left,
-    Right,
-    Middle,
-    TiltLeft,
-    TiltRight,
-    Back,
-    Forward,
-    Sniper,
-    DpiUp,
-    DpiDown,
-    DpiCycle,
-    Profile,
-    Grid(u8),
-}
-
-impl Role {
-    /// Derive the role from the button's factory action, then from its name.
-    pub fn of(b: &ButtonCaps) -> Option<Role> {
-        let by_action = match &b.default_action {
-            ButtonAction::Mouse(MouseButton::Left) => Some(Role::Left),
-            ButtonAction::Mouse(MouseButton::Right) => Some(Role::Right),
-            ButtonAction::Mouse(MouseButton::Middle) => Some(Role::Middle),
-            ButtonAction::Mouse(MouseButton::Back) => Some(Role::Back),
-            ButtonAction::Mouse(MouseButton::Forward) => Some(Role::Forward),
-            ButtonAction::Mouse(MouseButton::WheelLeft) => Some(Role::TiltLeft),
-            ButtonAction::Mouse(MouseButton::WheelRight) => Some(Role::TiltRight),
-            ButtonAction::Dpi(DpiFunction::Up) => Some(Role::DpiUp),
-            ButtonAction::Dpi(DpiFunction::Down) => Some(Role::DpiDown),
-            ButtonAction::Dpi(DpiFunction::Cycle) => Some(Role::DpiCycle),
-            ButtonAction::Dpi(DpiFunction::Shift(_)) => Some(Role::Sniper),
-            ButtonAction::ProfileCycle => Some(Role::Profile),
-            _ => None,
-        };
-        by_action.or_else(|| {
-            let n = b.name.to_ascii_lowercase();
-            let has = |s: &str| n.contains(s);
-            Some(
-                if has("scroll left") || has("tilt left") || has("wheel left") {
-                    Role::TiltLeft
-                } else if has("scroll right") || has("tilt right") || has("wheel right") {
-                    Role::TiltRight
-                } else if has("sniper") || has("dpi shift") {
-                    Role::Sniper
-                } else if has("dpi up") {
-                    Role::DpiUp
-                } else if has("dpi down") {
-                    Role::DpiDown
-                } else if has("dpi") {
-                    Role::DpiCycle
-                } else if has("profile") {
-                    Role::Profile
-                } else if has("middle") {
-                    Role::Middle
-                } else if has("left click") {
-                    Role::Left
-                } else if has("right click") {
-                    Role::Right
-                } else if n.ends_with("back") {
-                    Role::Back
-                } else if n.ends_with("forward") {
-                    Role::Forward
-                } else {
-                    return None;
-                },
-            )
-        })
-    }
-}
 
 /// The silhouettes the artwork can draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
-    /// Right-handed with a thumb rest and a sniper button (G502, Basilisk, M65...).
+    /// The G502 family: angular faceted shell, split nose, flared thumb rest (`g502.rs`).
+    G502,
+    /// Right-handed with a thumb rest and a sniper button (Basilisk, M65, G402...).
     Ergonomic,
     /// Mildly ergonomic (DeathAdder) and the fallback for unknown mice.
     ErgoLite,
@@ -127,10 +31,11 @@ impl Kind {
     pub fn for_name(name: &str) -> Kind {
         let n = name.to_ascii_lowercase();
         let any = |list: &[&str]| list.iter().any(|s| n.contains(s));
-        if any(&["naga", "scimitar", "mmo", "g600", "g604"]) {
+        if n.contains("g502") {
+            Kind::G502
+        } else if any(&["naga", "scimitar", "mmo", "g600", "g604"]) {
             Kind::Mmo
         } else if any(&[
-            "g502",
             "basilisk",
             "m65",
             "dark core",
@@ -167,6 +72,7 @@ impl Kind {
     /// Width divided by height of the artwork box.
     pub fn aspect(self) -> f32 {
         match self {
+            Kind::G502 => g502_shapes::ASPECT,
             Kind::Ergonomic => 0.66,
             Kind::ErgoLite => 0.62,
             Kind::Ambidextrous => 0.56,
@@ -174,9 +80,17 @@ impl Kind {
         }
     }
 
+    /// How far the artwork reaches above its box (the G502's cable), as a fraction of the height.
+    pub fn overhang(self) -> f32 {
+        match self {
+            Kind::G502 => g502_shapes::CABLE,
+            _ => 0.0,
+        }
+    }
+
     fn profile(self) -> Profile {
         match self {
-            Kind::Ergonomic => Profile {
+            Kind::G502 | Kind::Ergonomic => Profile {
                 a: 0.46,
                 p: 2.4,
                 k: 1.12,
@@ -343,15 +257,22 @@ pub struct MouseArt {
     pub(super) logo: (Pos2, f32),
 }
 
-/// Largest rect with the silhouette's proportions that fits in `avail`.
+/// Largest rect with the silhouette's proportions that fits in `avail`, leaving room above it
+/// for whatever the artwork draws outside its box (the cable).
 pub fn art_rect(avail: Rect, kind: Kind) -> Rect {
-    let h = avail.height().min(avail.width() / kind.aspect());
-    Rect::from_center_size(avail.center(), vec2(h * kind.aspect(), h))
+    let over = kind.overhang();
+    let h = (avail.height() / (1.0 + over)).min(avail.width() / kind.aspect());
+    let size = vec2(h * kind.aspect(), h);
+    let top = avail.center().y - h * (1.0 + over) / 2.0 + h * over;
+    Rect::from_min_size(pos2(avail.center().x - size.x / 2.0, top), size)
 }
 
 impl MouseArt {
     pub fn new(rect: Rect, kind: Kind) -> Self {
         let geo = Geo::new(rect, kind.profile());
+        if kind == Kind::G502 {
+            return super::g502::build(rect, geo);
+        }
         let (w, h) = (rect.width(), rect.height());
         let mut parts = Vec::new();
         let mut add = |role, poly: Vec<Pos2>, anchor: Option<Pos2>| {
@@ -428,7 +349,7 @@ impl MouseArt {
             rot_rrect(c, w * across, h * along, geo.flank_angle(t), 4.0)
         };
         match kind {
-            Kind::Ergonomic => {
+            Kind::G502 | Kind::Ergonomic => {
                 add(Role::Sniper, flank(0.265, 0.075, 0.085, 0.07), None);
                 add(Role::Back, flank(0.395, 0.085, 0.07, 0.078), None);
                 add(Role::Forward, flank(0.485, 0.09, 0.07, 0.078), None);
@@ -509,204 +430,4 @@ impl MouseArt {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use gearwise_core::model::ButtonAction;
-
-    fn caps(id: u16, name: &str, default: ButtonAction) -> ButtonCaps {
-        ButtonCaps {
-            id,
-            name: name.into(),
-            remappable: true,
-            default_action: default,
-            hotspot: None,
-        }
-    }
-
-    #[test]
-    fn silhouettes_follow_the_product_name() {
-        assert_eq!(Kind::for_name("G502 X Plus (demo)"), Kind::Ergonomic);
-        assert_eq!(Kind::for_name("Corsair M65 RGB Ultra"), Kind::Ergonomic);
-        assert_eq!(Kind::for_name("Razer Basilisk V3"), Kind::Ergonomic);
-        assert_eq!(Kind::for_name("Corsair Dark Core RGB"), Kind::Ergonomic);
-        assert_eq!(Kind::for_name("G Pro X Superlight"), Kind::Ambidextrous);
-        assert_eq!(Kind::for_name("Razer Viper Ultimate"), Kind::Ambidextrous);
-        assert_eq!(Kind::for_name("Razer Naga Pro"), Kind::Mmo);
-        assert_eq!(Kind::for_name("Corsair Scimitar Elite"), Kind::Mmo);
-        assert_eq!(Kind::for_name("DeathAdder V3"), Kind::ErgoLite);
-        assert_eq!(Kind::for_name("Some Unknown Mouse"), Kind::ErgoLite);
-    }
-
-    #[test]
-    fn roles_come_from_the_factory_action_then_the_name() {
-        assert_eq!(
-            Role::of(&caps(
-                1,
-                "Left click",
-                ButtonAction::Mouse(MouseButton::Left)
-            )),
-            Some(Role::Left)
-        );
-        assert_eq!(
-            Role::of(&caps(
-                2,
-                "G6 · DPI shift (1200)",
-                ButtonAction::Dpi(DpiFunction::Shift(1200))
-            )),
-            Some(Role::Sniper)
-        );
-        assert_eq!(
-            Role::of(&caps(3, "G9 · Profile cycle", ButtonAction::ProfileCycle)),
-            Some(Role::Profile)
-        );
-        assert_eq!(
-            Role::of(&caps(4, "G11 · Scroll left", ButtonAction::Default)),
-            Some(Role::TiltLeft)
-        );
-        assert_eq!(
-            Role::of(&caps(5, "Back", ButtonAction::Default)),
-            Some(Role::Back)
-        );
-        assert_eq!(Role::of(&caps(6, "Button 7", ButtonAction::Default)), None);
-    }
-
-    /// The G502 HERO as drivers report it: eleven buttons, five with hotspots.
-    fn g502_hero() -> Vec<ButtonCaps> {
-        let mouse = |b| ButtonAction::Mouse(b);
-        let mut v = vec![
-            caps(0, "Left click", mouse(MouseButton::Left)),
-            caps(1, "Right click", mouse(MouseButton::Right)),
-            caps(2, "Middle click", mouse(MouseButton::Middle)),
-            caps(3, "Back", mouse(MouseButton::Back)),
-            caps(4, "Forward", mouse(MouseButton::Forward)),
-            caps(
-                5,
-                "G6 · DPI shift (1200)",
-                ButtonAction::Dpi(DpiFunction::Shift(1200)),
-            ),
-            caps(6, "G7 · DPI down", ButtonAction::Dpi(DpiFunction::Down)),
-            caps(7, "G8 · DPI up", ButtonAction::Dpi(DpiFunction::Up)),
-            caps(8, "G9 · Profile cycle", ButtonAction::ProfileCycle),
-            caps(9, "G10 · Scroll right", mouse(MouseButton::WheelRight)),
-            caps(10, "G11 · Scroll left", mouse(MouseButton::WheelLeft)),
-        ];
-        for (b, h) in
-            v.iter_mut()
-                .zip([(0.3, 0.2), (0.7, 0.2), (0.5, 0.17), (0.1, 0.5), (0.11, 0.4)])
-        {
-            b.hotspot = Some(h);
-        }
-        v
-    }
-
-    #[test]
-    fn every_g502_hero_button_gets_an_anatomical_anchor() {
-        let art = MouseArt::new(
-            Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 455.0)),
-            Kind::Ergonomic,
-        );
-        let placed = art.place(&g502_hero());
-        assert_eq!(placed.len(), 11);
-        assert!(
-            placed.iter().all(|p| p.role.is_some()),
-            "roles beat raw hotspots"
-        );
-        assert!(
-            placed
-                .iter()
-                .all(|p| art.rect.expand(2.0).contains(p.anchor))
-        );
-        // Back sits on the left flank, below the sniper button; the right button is right of centre.
-        let at = |r: Role| placed.iter().find(|p| p.role == Some(r)).unwrap().anchor;
-        assert!(at(Role::Back).x < art.rect.center().x && at(Role::Back).y > at(Role::Sniper).y);
-        assert!(at(Role::Right).x > art.rect.center().x);
-    }
-
-    #[test]
-    fn buttons_without_a_matching_part_fall_back_to_hotspots_or_the_grid() {
-        let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 430.0));
-        // Sniper has no part on an ambidextrous mouse, so its hotspot is used.
-        let mut sniper = caps(1, "Sniper", ButtonAction::Dpi(DpiFunction::Shift(400)));
-        sniper.hotspot = Some((0.1, 0.3));
-        let placed = MouseArt::new(rect, Kind::Ambidextrous).place(&[sniper.clone()]);
-        assert_eq!(
-            (placed[0].role, placed[0].anchor),
-            (None, pos2(30.0, 129.0))
-        );
-        // Without a hotspot it is left out of the callouts.
-        sniper.hotspot = None;
-        assert!(
-            MouseArt::new(rect, Kind::Ambidextrous)
-                .place(&[sniper])
-                .is_empty()
-        );
-        // MMO mice give unknown buttons a grid cell each, in order.
-        let unknown: Vec<ButtonCaps> = (0..14)
-            .map(|i| caps(i, &format!("Button {i}"), ButtonAction::Default))
-            .collect();
-        let placed = MouseArt::new(rect, Kind::Mmo).place(&unknown);
-        assert_eq!(placed.len(), 12);
-        assert_eq!(placed[0].role, Some(Role::Grid(0)));
-        assert_eq!(placed[11].role, Some(Role::Grid(11)));
-    }
-
-    #[test]
-    fn each_role_is_used_once() {
-        let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(300.0, 430.0));
-        let twice = vec![
-            caps(1, "Left click", ButtonAction::Mouse(MouseButton::Left)),
-            caps(
-                2,
-                "Left click again",
-                ButtonAction::Mouse(MouseButton::Left),
-            ),
-        ];
-        assert_eq!(MouseArt::new(rect, Kind::ErgoLite).place(&twice).len(), 1);
-    }
-
-    #[test]
-    fn parts_stay_inside_the_shell_box() {
-        for kind in [
-            Kind::Ergonomic,
-            Kind::ErgoLite,
-            Kind::Ambidextrous,
-            Kind::Mmo,
-        ] {
-            let rect =
-                Rect::from_min_size(pos2(50.0, 40.0), vec2(300.0 * kind.aspect() / 0.66, 455.0));
-            let art = MouseArt::new(rect, kind);
-            for part in &art.parts {
-                assert!(
-                    part.poly.iter().all(|q| rect.expand(3.0).contains(*q)),
-                    "{kind:?} {:?} leaves the box",
-                    part.role
-                );
-            }
-            let outline = art.geo.outline();
-            let (min, max) = outline
-                .iter()
-                .fold((f32::MAX, f32::MIN), |(a, b), q| (a.min(q.x), b.max(q.x)));
-            assert!(
-                (min - rect.min.x).abs() < 1.0 && (max - rect.max.x).abs() < 1.0,
-                "{kind:?} spans the full width"
-            );
-        }
-    }
-
-    #[test]
-    fn ergonomic_shell_is_wider_on_the_thumb_side() {
-        let p = Kind::Ergonomic.profile();
-        let (l, r) = p.edges(0.6);
-        assert!(-l > r * 1.1, "thumb rest bulges on the left");
-        let (l, r) = Kind::Ambidextrous.profile().edges(0.6);
-        assert!((-l - r).abs() < 1e-4, "ambidextrous is symmetric");
-    }
-
-    #[test]
-    fn zone_names_map_to_roles() {
-        assert_eq!(zone_role("Logo"), ZoneRole::Logo);
-        assert_eq!(zone_role("Scroll wheel"), ZoneRole::Wheel);
-        assert_eq!(zone_role("Primary"), ZoneRole::Body);
-        assert_eq!(zone_role("Underglow"), ZoneRole::Body);
-    }
-}
+mod tests;
