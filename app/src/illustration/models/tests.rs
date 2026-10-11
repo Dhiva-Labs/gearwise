@@ -170,6 +170,7 @@ fn models_paint_with_every_tint_and_highlight_in_both_themes() {
                             wheel: Some(Color32::GREEN),
                             body: Some(Color32::BLUE),
                             highlight,
+                            ..Default::default()
                         };
                         art.paint(ui.painter(), &pal, &look, &tint);
                     }

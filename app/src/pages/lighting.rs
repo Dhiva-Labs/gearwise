@@ -325,6 +325,9 @@ fn preview(ui: &mut Ui, dev: &DeviceView, selected: &LightingZoneCaps, t: f32, h
             ZoneRole::Wheel => look.wheel = color,
             ZoneRole::Body => look.body = color,
         }
+        if let Some(b) = illustration::zone_band(&z.name) {
+            look.bands[b] = color;
+        }
     }
     match dev.desc.kind {
         DeviceKind::Keyboard => {

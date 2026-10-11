@@ -17,7 +17,7 @@ pub use keyboard::{
     paint_zone_outline,
 };
 pub use mouse::{Design, MouseArt, art_rect};
-pub use roles::{MouseLook, Role, ZoneRole, zone_role};
+pub use roles::{MouseLook, Role, ZoneRole, zone_band, zone_role};
 
 /// Map a normalised device coordinate (0-1, x left to right, y front to back) onto `rect`.
 pub fn at(rect: Rect, p: (f32, f32)) -> Pos2 {
@@ -79,6 +79,7 @@ mod tests {
                             wheel: Some(Color32::GREEN),
                             body: Some(Color32::BLUE),
                             highlight: Some(ZoneRole::Body),
+                            ..Default::default()
                         };
                         art.paint(
                             ui.painter(),

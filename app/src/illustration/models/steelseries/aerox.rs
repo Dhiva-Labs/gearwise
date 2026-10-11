@@ -376,16 +376,38 @@ impl Aerox {
             let axis = 1.0 - ((q.x - rect.center().x).abs() / (rect.width() * 0.5)).min(1.0);
             (0.3 + 0.7 * t.clamp(0.0, 1.0).powf(1.2) * (0.65 + 0.35 * axis)).clamp(0.0, 1.0)
         };
-        match look.body {
-            Some(c) => hole_mesh(
+        // Each hole takes the colour of the band it sits in (front, middle,
+        // rear zones), or the single body colour on devices without bands.
+        let (bands, body) = (look.bands, look.body);
+        let banded = bands.iter().any(Option::is_some);
+        let zone = move |q: Pos2| -> Option<Color32> {
+            if !banded {
+                return body;
+            }
+            let y = (q.y - rect.min.y) / rect.height();
+            bands[if y < 0.45 {
+                0
+            } else if y < 0.7 {
+                1
+            } else {
+                2
+            }]
+        };
+        if banded || body.is_some() {
+            hole_mesh(
                 p,
                 &holes,
-                |q| mix(dark, mix(c, Color32::WHITE, 0.1), level(q)),
-                |q| mix(dark, mix(c, Color32::WHITE, 0.55), level(q).powf(0.8)),
-            ),
-            None => hole_mesh(p, &holes, |_| dark, |_| mix(dark, sk.low, 0.4)),
+                |q| zone(q).map_or(dark, |c| mix(dark, mix(c, Color32::WHITE, 0.1), level(q))),
+                |q| {
+                    zone(q).map_or(mix(dark, sk.low, 0.4), |c| {
+                        mix(dark, mix(c, Color32::WHITE, 0.55), level(q).powf(0.8))
+                    })
+                },
+            );
+        } else {
+            hole_mesh(p, &holes, |_| dark, |_| mix(dark, sk.low, 0.4));
         }
-        if let Some(c) = look.body {
+        if let Some(c) = bands[2].or(body) {
             // A soft halo under the tail, where the light spills over the edge.
             let tail = f.pt((0.5, 0.95));
             glow(p, tail, rect.width() * 0.1, with_alpha(c, 14));

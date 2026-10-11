@@ -62,6 +62,23 @@ the published protocol work of libratbag, Solaar, OpenRazer, OpenRGB,
 ckb-next and rivalcfg and covered by byte-exact unit tests against emulated
 firmware — reports from owners of other devices are very welcome.
 
+## Device artwork
+
+Supported mice are drawn as original vector renditions of the real product,
+with every button labelled where it physically is and lighting zones glowing
+in their live colours:
+
+| Brand | Models drawn |
+|---|---|
+| Logitech | G502 HERO / Lightspeed, G502 X / X Plus, G Pro X Superlight 2 / G Pro Wireless, G305 / G304, G703 / G403, G903, G600, MX Master 3S, MX Anywhere 3S |
+| Razer | DeathAdder V3 (Pro), Viper V3 Pro, Viper Ultimate / V2 Pro, Basilisk V3 (Pro), Naga V2 Pro / Pro, Cobra (Pro) |
+| Corsair | M65 RGB Ultra / Elite / Pro, Dark Core RGB Pro, Scimitar Elite, Katar Pro, Harpoon RGB |
+| SteelSeries | Rival 3, Rival 600 / 650 / 310, Aerox 3 / 5 / 9, Prime family, Sensei Ten / 310 |
+
+Keyboards are drawn from their physical layout (macro columns, media keys,
+wrist rest — e.g. the K55 RGB PRO) or their per-key layout. Anything else
+falls back to a generic silhouette.
+
 ## Install
 
 ### Linux

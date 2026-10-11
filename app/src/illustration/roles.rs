@@ -15,6 +15,20 @@ pub enum ZoneRole {
     Body,
 }
 
+/// Which body band (front, middle, rear) a zone name refers to, if any.
+pub fn zone_band(name: &str) -> Option<usize> {
+    let n = name.to_ascii_lowercase();
+    if n.contains("front") {
+        Some(0)
+    } else if n.contains("middle") || n.contains("mid ") {
+        Some(1)
+    } else if n.contains("rear") || n.contains("back") {
+        Some(2)
+    } else {
+        None
+    }
+}
+
 pub fn zone_role(name: &str) -> ZoneRole {
     let n = name.to_ascii_lowercase();
     if n.contains("logo") {
@@ -32,6 +46,10 @@ pub struct MouseLook {
     pub logo: Option<Color32>,
     pub wheel: Option<Color32>,
     pub body: Option<Color32>,
+    /// Front / middle / rear body zones, for mice that light their shell in
+    /// bands (SteelSeries Aerox and similar). `None` where a band is off or
+    /// the device has no such zone; models fall back to `body`.
+    pub bands: [Option<Color32>; 3],
     pub highlight: Option<ZoneRole>,
 }
 
