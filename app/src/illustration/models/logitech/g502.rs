@@ -21,7 +21,8 @@ use crate::illustration::shapes::{
 };
 use crate::theme::{Palette, mix, with_alpha};
 
-/// The G502 family: HERO, Proteus, Lightspeed, X and X Plus share the shell.
+/// The G502 HERO family: HERO, Proteus and Lightspeed share the shell (the X models, a newer
+/// shell, have their own drawing).
 pub struct G502;
 
 impl ModelArt for G502 {
@@ -36,7 +37,6 @@ impl ModelArt for G502 {
     fn examples(&self) -> &'static [&'static str] {
         &[
             "G502 HERO Gaming Mouse",
-            "G502 X Plus (demo)",
             "G502 LIGHTSPEED",
             "G502 Proteus Spectrum",
         ]
