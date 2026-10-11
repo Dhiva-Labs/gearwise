@@ -58,8 +58,8 @@ pub fn hatch(poly: &[Pos2], angle: f32, gap: f32) -> Vec<[Pos2; 2]> {
             }
         }
         xs.sort_by(f32::total_cmp);
-        for pair in xs.chunks_exact(2) {
-            out.push([back(pos2(pair[0], y)), back(pos2(pair[1], y))]);
+        for &[l, r] in xs.as_chunks::<2>().0 {
+            out.push([back(pos2(l, y)), back(pos2(r, y))]);
         }
         y += gap;
     }
