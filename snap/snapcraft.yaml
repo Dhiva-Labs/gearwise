@@ -19,6 +19,8 @@ description: |
       sudo snap connect gearwise:uinput
       sudo snap connect gearwise:hardware-observe
 
+  Graphics come from the mesa-2404 snap, installed automatically.
+
   Then unplug and replug your devices. Close G HUB, Synapse, iCUE or GG if
   they run in a VM or Wine prefix.
 website: https://github.com/Dhiva-Labs/gearwise
@@ -35,14 +37,26 @@ platforms:
 apps:
   gearwise:
     command: bin/gearwise
+    # Mesa from the mesa-2404 content snap (gpu-2404 interface).
+    command-chain: [bin/gpu-2404-wrapper]
     desktop: meta/gui/gearwise.desktop
-    extensions: [gnome]
+    environment:
+      LD_LIBRARY_PATH: $SNAP/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+      XKB_CONFIG_ROOT: $SNAP/usr/share/X11/xkb
+      XCURSOR_PATH: $SNAP/usr/share/icons
     plugs:
+      - wayland
+      - x11
+      - desktop
       - hidraw-devices
       - uinput
       - hardware-observe
 
 plugs:
+  gpu-2404:
+    interface: content
+    target: $SNAP/gpu-2404
+    default-provider: mesa-2404
   # Raw access to the mice/keyboards' HID interfaces. Paired with the slot
   # below; needs a store declaration (see packaging/SNAP.md).
   hidraw-devices:
@@ -58,6 +72,14 @@ slots:
     udev-tagging:
       - kernel: hidraw*
         subsystem: hidraw
+
+layout:
+  /usr/share/libdrm:
+    bind: $SNAP/gpu-2404/libdrm
+  /usr/share/drirc.d:
+    symlink: $SNAP/gpu-2404/drirc.d
+  /usr/share/X11/XErrorDB:
+    symlink: $SNAP/gpu-2404/X11/XErrorDB
 
 parts:
   gearwise:
@@ -78,6 +100,27 @@ parts:
       curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain "$RUSTUP_TOOLCHAIN" --no-modify-path
       "$CARGO_HOME/bin/cargo" build --release --locked -p gearwise
       install -Dm755 target/release/gearwise "$CRAFT_PART_INSTALL/bin/gearwise"
+    # Loaded at runtime by winit/glutin (X11 or Wayland, EGL/GLX via glvnd).
+    stage-packages:
+      - libegl1
+      - libgl1
+      - libglvnd0
+      - libglx0
+      - libopengl0
+      - libwayland-client0
+      - libwayland-cursor0
+      - libwayland-egl1
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libx11-6
+      - libx11-xcb1
+      - libxcb1
+      - libxcursor1
+      - libxi6
+      - libxrandr2
+      - xkb-data
+      - dmz-cursor-theme
+
   extras:
     plugin: dump
     source: packaging/linux
@@ -85,3 +128,13 @@ parts:
       70-gearwise.rules: udev/70-gearwise.rules
     stage:
       - udev/70-gearwise.rules
+
+  gpu-2404:
+    after: [gearwise]
+    source: https://github.com/canonical/gpu-snap.git
+    plugin: dump
+    override-prime: |
+      craftctl default
+      ${CRAFT_PART_SRC}/bin/gpu-2404-cleanup mesa-2404
+    prime:
+      - bin/gpu-2404-wrapper
