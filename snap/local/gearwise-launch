@@ -1,0 +1,12 @@
+#!/bin/sh
+# Strict snaps get a private XDG_RUNTIME_DIR (/run/user/<uid>/snap.<name>), so
+# a relative WAYLAND_DISPLAY such as "wayland-0" points at nothing. Hand the
+# client the session socket's absolute path; the wayland interface allows it.
+if [ -n "$WAYLAND_DISPLAY" ] && [ "${WAYLAND_DISPLAY#/}" = "$WAYLAND_DISPLAY" ]; then
+    session_socket="$(dirname "$XDG_RUNTIME_DIR")/$WAYLAND_DISPLAY"
+    if [ -S "$session_socket" ]; then
+        export WAYLAND_DISPLAY="$session_socket"
+    fi
+fi
+mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+exec "$@"

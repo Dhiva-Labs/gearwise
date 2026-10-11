@@ -38,12 +38,13 @@ apps:
   gearwise:
     command: bin/gearwise
     # Mesa from the mesa-2404 content snap (gpu-2404 interface).
-    command-chain: [bin/gpu-2404-wrapper]
+    command-chain: [bin/gpu-2404-wrapper, bin/gearwise-launch]
     environment:
       LD_LIBRARY_PATH: $SNAP/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
       XKB_CONFIG_ROOT: $SNAP/usr/share/X11/xkb
       XCURSOR_PATH: $SNAP/usr/share/icons
     plugs:
+      - opengl
       - wayland
       - x11
       - desktop
@@ -127,6 +128,12 @@ parts:
       70-gearwise.rules: udev/70-gearwise.rules
     stage:
       - udev/70-gearwise.rules
+
+  launcher:
+    plugin: dump
+    source: snap/local
+    organize:
+      gearwise-launch: bin/gearwise-launch
 
   gpu-2404:
     after: [gearwise]
