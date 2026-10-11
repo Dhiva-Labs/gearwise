@@ -23,7 +23,7 @@ fn registered_models_take_precedence_over_the_generic_silhouettes() {
     assert_eq!(model_id("G502 X Plus (demo)"), Some("g502"));
     assert_eq!(model_id("G502 HERO Gaming Mouse"), Some("g502"));
     assert_eq!(model_id("MX Master 3S"), Some("mx-master"));
-    assert_eq!(model_id("Corsair M65 RGB Ultra"), None);
+    assert_eq!(model_id("Corsair M65 RGB Ultra"), Some("m65"));
     assert!(matches!(
         Design::for_name("Some Unknown Mouse"),
         Design::Generic(Kind::ErgoLite)
