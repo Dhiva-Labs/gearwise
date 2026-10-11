@@ -61,15 +61,21 @@ slots:
 
 parts:
   gearwise:
-    plugin: rust
+    # Built with the pinned toolchain from rust-toolchain.toml, installed by
+    # rustup-init: the rust plugin's rustup integration is fragile in
+    # managed builds.
+    plugin: nil
     source: .
-    rust-channel: "1.97.1"
-    rust-path: [app]
-    # The plugin installs the pinned channel through rustup.
-    build-snaps:
-      - rustup
     build-packages:
+      - curl
+      - gcc
       - pkg-config
+    override-build: |
+      export RUSTUP_HOME="$CRAFT_PART_BUILD/.rustup" CARGO_HOME="$CRAFT_PART_BUILD/.cargo"
+      export RUSTUP_TOOLCHAIN=1.97.1
+      curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain "$RUSTUP_TOOLCHAIN" --no-modify-path
+      "$CARGO_HOME/bin/cargo" build --release --locked -p gearwise
+      install -Dm755 target/release/gearwise "$CRAFT_PART_INSTALL/bin/gearwise"
   extras:
     plugin: dump
     source: packaging/linux
