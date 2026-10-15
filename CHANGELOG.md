@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-10-16
 
-- Arm64 builds next to x64: `gearwise-<version>-linux-aarch64.tar.gz`,
-  `gearwise_<version>_arm64.deb` and `gearwise-<version>-windows-aarch64.zip`,
-  each built and started natively on Arm in CI. The snap now builds for
-  arm64 as well.
+- Added: Linux arm64 and Windows arm64 builds next to x64:
+  `gearwise-<version>-linux-aarch64.tar.gz`, `gearwise_<version>_arm64.deb` and
+  `gearwise-<version>-windows-aarch64.zip`, each built and started natively on
+  Arm in CI. The snap now builds for arm64 as well.
+- Fixed: the strict snap now gets Wayland and GPU access (Mesa from the
+  `gpu-2404` interface, the `opengl` plug and an absolute `WAYLAND_DISPLAY`
+  socket path), and its desktop entry is picked up from `snap/gui`.
+- Docs: PPA, release downloads and Snap Store status; README names the arm64
+  downloads and carries build badges.
 
 ## 0.1.0 — 2026-10-11
 
