@@ -2,8 +2,12 @@
 
 # Gearwise
 
+[![ARM64 builds](https://github.com/Dhiva-Labs/gearwise/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/gearwise/actions/workflows/ci.yml)
+![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Windows x64 | arm64](https://img.shields.io/badge/Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
+
 One lightweight app to configure gaming mice and keyboards from **Logitech,
-Razer, Corsair and SteelSeries** on **Linux and Windows** — DPI stages,
+Razer, Corsair and SteelSeries** on **Linux and Windows** (x64 and Arm64) — DPI stages,
 report rate, RGB lighting (zones and per-key), button assignments, onboard
 profiles, macros and per-application profiles. An open alternative to
 G HUB, Synapse, iCUE and GG that ships as a single small native binary.
@@ -95,11 +99,16 @@ devices and `/dev/uinput` (for macros) — replug your devices afterwards.
 
 Download from the [latest release](https://github.com/Dhiva-Labs/gearwise/releases/latest):
 
-* `gearwise_*_amd64.deb` → `sudo apt install ./gearwise_*_amd64.deb`
-* `gearwise-*-linux-x86_64.tar.gz` → extract, run `sudo ./install-udev-rules.sh`
-  once, then `./gearwise`
+| | x64 (x86-64) | Arm64 (aarch64) |
+|---|---|---|
+| Debian / Ubuntu package | `gearwise_*_amd64.deb` | `gearwise_*_arm64.deb` |
+| Any Linux | `gearwise-*-linux-x86_64.tar.gz` | `gearwise-*-linux-aarch64.tar.gz` |
 
-Linux builds need glibc 2.35+ (Ubuntu 22.04 or newer).
+* `.deb` → `sudo apt install ./gearwise_*_<arch>.deb` (`amd64` or `arm64`)
+* tarball → extract, run `sudo ./install-udev-rules.sh` once, then `./gearwise`
+
+Linux builds need glibc 2.35+ (Ubuntu 22.04 or newer), on x86-64 or Arm64
+(aarch64). Every release also lists a `SHA256SUMS` file for all packages.
 
 ### Snap Store
 
@@ -108,8 +117,9 @@ before it can be published (see [packaging/SNAP.md](packaging/SNAP.md)).
 
 ### Windows
 
-Download `gearwise-*-windows-x86_64.zip` from the
-[latest release](https://github.com/Dhiva-Labs/gearwise/releases/latest)
+Download `gearwise-*-windows-x86_64.zip` (most PCs) or
+`gearwise-*-windows-aarch64.zip` (Windows on Arm, e.g. Snapdragon X laptops)
+from the [latest release](https://github.com/Dhiva-Labs/gearwise/releases/latest)
 and run `gearwise.exe`. Close G HUB / Synapse / iCUE / GG first: they can
 hold devices exclusively or overwrite settings.
 

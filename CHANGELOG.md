@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Arm64 builds next to x64: `gearwise-<version>-linux-aarch64.tar.gz`,
+  `gearwise_<version>_arm64.deb` and `gearwise-<version>-windows-aarch64.zip`,
+  each built and started natively on Arm in CI. The snap now builds for
+  arm64 as well.
+
 ## 0.1.0 — 2026-10-11
 
 First release.
