@@ -1,7 +1,10 @@
 #!/bin/sh
 # Assemble a binary .deb from a release build.
 #
-#   packaging/linux/build-deb.sh <path/to/gearwise> <version> <out-dir>
+#   packaging/linux/build-deb.sh <path/to/gearwise> <version> <out-dir> [arch]
+#
+# arch is the Debian architecture of the binary (amd64, arm64); it defaults to
+# the architecture of the machine the script runs on.
 #
 # Layout: binary in /usr/bin, desktop entry and hicolor icons, the udev rule
 # in /usr/lib/udev/rules.d (so the logged-in user can open the devices and
@@ -14,7 +17,7 @@ version=$2
 out=$3
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH='' cd -- "$here/../.." && pwd)
-arch=amd64
+arch=${4:-$(dpkg --print-architecture)}
 pkg=gearwise_${version}_${arch}
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT

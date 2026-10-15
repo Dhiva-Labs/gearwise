@@ -33,6 +33,7 @@ grade: stable
 confinement: strict
 platforms:
   amd64:
+  arm64:
 
 apps:
   gearwise:
@@ -40,7 +41,7 @@ apps:
     # Mesa from the mesa-2404 content snap (gpu-2404 interface).
     command-chain: [bin/gpu-2404-wrapper, bin/gearwise-launch]
     environment:
-      LD_LIBRARY_PATH: $SNAP/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$LD_LIBRARY_PATH
       XKB_CONFIG_ROOT: $SNAP/usr/share/X11/xkb
       XCURSOR_PATH: $SNAP/usr/share/icons
     plugs:
