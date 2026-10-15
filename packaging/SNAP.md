@@ -50,7 +50,7 @@ snapcraft pack --use-lxd
 ## Test locally
 
 ```bash
-sudo snap install --dangerous ./gearwise_0.1.0_amd64.snap
+sudo snap install --dangerous ./gearwise_0.1.1_amd64.snap
 sudo cp /snap/gearwise/current/udev/70-gearwise.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules && sudo udevadm trigger
 sudo snap connect gearwise:hidraw-devices gearwise:hidraw
@@ -63,7 +63,7 @@ snap run gearwise
 
 ```bash
 snapcraft register gearwise          # once
-snapcraft upload gearwise_0.1.0_amd64.snap
+snapcraft upload gearwise_0.1.1_amd64.snap
 snapcraft revisions gearwise         # shows the revision waiting for review
 ```
 

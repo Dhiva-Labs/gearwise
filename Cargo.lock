@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "egui",
@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "log",
  "serde",
@@ -761,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-corsair"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "gearwise-hid",
@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-hid"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "hidapi",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-input"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "libc",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-logitech"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "gearwise-hid",
@@ -800,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-razer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "log",
@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "gearwise-steelseries"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gearwise-core",
  "log",

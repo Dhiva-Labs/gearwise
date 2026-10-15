@@ -1,6 +1,6 @@
 name: gearwise
 title: Gearwise
-version: "0.1.0"
+version: "0.1.1"
 summary: Configure Logitech, Razer, Corsair and SteelSeries mice and keyboards
 description: |
   Gearwise is a lightweight native app for gaming mice and keyboards from
