@@ -5,19 +5,44 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   test:
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            # What `file` and the PE header must say about the built binary.
+            file: x86-64
+          - os: ubuntu-24.04-arm
+            file: ARM aarch64
+          - os: windows-latest
+            machine: '0x8664'
+          # ARM64 Windows is built and tested natively on Windows 11 on ARM.
+          - os: windows-11-arm
+            machine: '0xAA64'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install rustup (the Windows ARM image has none)
+        if: runner.os == 'Windows' && runner.arch == 'ARM64'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
+            $init = "$env:RUNNER_TEMP\rustup-init.exe"
+            Invoke-WebRequest "https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe" -OutFile $init
+            & $init -y --default-toolchain none --profile minimal
+            "$env:USERPROFILE\.cargo\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          }
       - uses: dtolnay/rust-toolchain@1.97.1
         with:
           components: clippy, rustfmt
@@ -28,6 +53,34 @@ jobs:
         run: cargo test --workspace
       - name: Release build
         run: cargo build --release -p gearwise
+      - name: Check the binary is native (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          file target/release/gearwise
+          file target/release/gearwise | grep -q '${{ matrix.file }}'
+          target/release/gearwise --version
+      - name: Check the binary is native (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $b = [IO.File]::ReadAllBytes("target\release\gearwise.exe")
+          $machine = [BitConverter]::ToUInt16($b, [BitConverter]::ToInt32($b, 0x3C) + 4)
+          "gearwise.exe machine type: 0x{0:X4}" -f $machine
+          if ($machine -ne ${{ matrix.machine }}) { throw ("gearwise.exe is machine 0x{0:X4}, expected ${{ matrix.machine }}" -f $machine) }
+          # A GUI-subsystem program prints nothing; it must start and exit 0.
+          $p = Start-Process target\release\gearwise.exe -ArgumentList '--version' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "gearwise.exe --version exited with $($p.ExitCode)" }
+      # The screenshot tour renders the real UI with demo devices, so it
+      # proves that the window, the GL context and the fonts work on this CPU.
+      - name: Start the app headless (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri libegl1 libxkbcommon-x11-0
+          shots="$RUNNER_TEMP/shots"
+          xvfb-run -a target/release/gearwise --screenshot "$shots" --only 03-sensitivity
+          ls -l "$shots"
+          test -s "$shots/03-sensitivity.png"
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -36,3 +89,31 @@ jobs:
             target/release/gearwise
             target/release/gearwise.exe
           if-no-files-found: ignore
+
+  snap-arm64:
+    name: snap (arm64)
+    # Built natively on Arm, in LXD like a store build. The result is only a
+    # workflow artifact: it is never uploaded to the Snap Store from here.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: snapcraft
+      - name: Check the snap is arm64
+        run: |
+          snap="${{ steps.snapcraft.outputs.snap }}"
+          ls -l "$snap"
+          d="$RUNNER_TEMP/snap"
+          unsquashfs -d "$d" -f "$snap" meta/snap.yaml bin/gearwise
+          cat "$d/meta/snap.yaml"
+          grep -q 'arm64' "$d/meta/snap.yaml"
+          file "$d/bin/gearwise"
+          file "$d/bin/gearwise" | grep -q 'ARM aarch64'
+          # No hard-coded x86 library path may be left in the app's environment.
+          ! grep -q 'x86_64' "$d/meta/snap.yaml"
+          grep -q 'LD_LIBRARY_PATH: .*aarch64-linux-gnu' "$d/meta/snap.yaml"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gearwise-snap-arm64
+          path: ${{ steps.snapcraft.outputs.snap }}
+          if-no-files-found: error

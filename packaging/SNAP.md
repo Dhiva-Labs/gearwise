@@ -24,6 +24,17 @@ Snap interfaces do not change Unix permissions: users still need the udev
 rule. A confined snap cannot write `/etc/udev`, so the rule ships inside the
 snap and the description gives the one-time copy command.
 
+## Architectures
+
+`snap/snapcraft.yaml` lists `amd64` and `arm64` under `platforms`. Snapcraft
+builds on the machine's own architecture (rustup installs the native
+toolchain), so an arm64 snap is built on an arm64 host, for example a
+`ubuntu-24.04-arm` runner: CI does that on every push and keeps the result as
+the `gearwise-snap-arm64` workflow artifact. Nothing is uploaded to the store
+from CI. The arm64 snap has not been run on real Arm hardware with the `mesa-2404`
+graphics content snap yet; upload it only after the first amd64 revision has
+been approved.
+
 ## Build
 
 Docker's `FORWARD DROP` policy cuts LXD's bridge, so while Docker runs the

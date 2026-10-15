@@ -1,45 +1,129 @@
 name: Release
 
+# A version tag builds, packages and publishes the release. Pull requests that
+# touch the release machinery, and manual runs, build and check every package
+# the same way but publish nothing: only the last job uploads, and only for a tag.
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "packaging/**"
+      - "rust-toolchain.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   linux:
-    # Oldest supported runner, so the binary runs on Ubuntu 22.04 and newer.
-    runs-on: ubuntu-22.04
+    name: linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported runner of each architecture, so the binary
+          # runs on Ubuntu 22.04 (glibc 2.35) and newer.
+          - arch: x86_64
+            deb: amd64
+            runner: ubuntu-22.04
+            file: x86-64
+          - arch: aarch64
+            deb: arm64
+            runner: ubuntu-22.04-arm
+            file: ARM aarch64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            v=${GITHUB_REF_NAME#v}
+          else
+            v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@1.97.1
       - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --release -p gearwise
       - name: Package
         run: |
-          v=${GITHUB_REF_NAME#v}
           mkdir -p dist
-          packaging/linux/build-deb.sh target/release/gearwise "$v" dist
-          t=gearwise-$v-linux-x86_64
+          packaging/linux/build-deb.sh target/release/gearwise "$VERSION" dist
+          t=gearwise-$VERSION-linux-${{ matrix.arch }}
           mkdir -p "$t/icons"
           cp target/release/gearwise README.md LICENSE CHANGELOG.md "$t/"
           cp packaging/linux/70-gearwise.rules packaging/linux/install-udev-rules.sh packaging/linux/gearwise.desktop "$t/"
           cp packaging/icons/*.png "$t/icons/"
           tar -czf "dist/$t.tar.gz" "$t"
+          ls -l dist
+      - name: Check the packages are ${{ matrix.arch }}
+        run: |
+          deb=dist/gearwise_${VERSION}_${{ matrix.deb }}.deb
+          tgz=dist/gearwise-$VERSION-linux-${{ matrix.arch }}.tar.gz
+          test -f "$deb" && test -f "$tgz"
+          test "$(dpkg-deb -f "$deb" Architecture)" = ${{ matrix.deb }}
+          mkdir "$RUNNER_TEMP/unpacked"
+          dpkg-deb -x "$deb" "$RUNNER_TEMP/unpacked"
+          tar -xzf "$tgz" -C "$RUNNER_TEMP/unpacked"
+          for b in "$RUNNER_TEMP/unpacked/usr/bin/gearwise" "$RUNNER_TEMP/unpacked/gearwise-$VERSION-linux-${{ matrix.arch }}/gearwise"; do
+            file "$b"
+            file "$b" | grep -q '${{ matrix.file }}'
+          done
+      - name: Install the .deb and start the app
+        # The package's dependencies must resolve on this architecture, and the
+        # installed program must run (the screenshot tour draws the real UI).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./dist/gearwise_${VERSION}_${{ matrix.deb }}.deb xvfb libgl1-mesa-dri
+          gearwise --version
+          shots="$RUNNER_TEMP/shots"
+          xvfb-run -a gearwise --screenshot "$shots" --only 03-sensitivity
+          test -s "$shots/03-sensitivity.png"
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: linux-${{ matrix.arch }}
           path: dist/*
+          if-no-files-found: error
 
   windows:
-    runs-on: windows-latest
+    name: windows ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-latest
+            machine: '0x8664'
+          # Built natively on Windows 11 on ARM.
+          - arch: aarch64
+            runner: windows-11-arm
+            machine: '0xAA64'
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $v = "$env:GITHUB_REF_NAME".TrimStart('v') }
+          else { $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value }
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Install rustup (the ARM image has none)
+        if: runner.arch == 'ARM64'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
+            $init = "$env:RUNNER_TEMP\rustup-init.exe"
+            Invoke-WebRequest "https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe" -OutFile $init
+            & $init -y --default-toolchain none --profile minimal
+            "$env:USERPROFILE\.cargo\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          }
       - uses: dtolnay/rust-toolchain@1.97.1
       - uses: Swatinem/rust-cache@v2
       - name: Build
@@ -47,17 +131,29 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $v = "$env:GITHUB_REF_NAME".TrimStart("v")
-          $t = "gearwise-$v-windows-x86_64"
+          $t = "gearwise-$env:VERSION-windows-${{ matrix.arch }}"
           New-Item -ItemType Directory -Force -Path "$t", dist | Out-Null
           Copy-Item target/release/gearwise.exe, README.md, LICENSE, CHANGELOG.md "$t/"
           Compress-Archive -Path "$t/*" -DestinationPath "dist/$t.zip"
+      - name: Check the program is native to this machine
+        shell: pwsh
+        run: |
+          $b = [IO.File]::ReadAllBytes("target\release\gearwise.exe")
+          $machine = [BitConverter]::ToUInt16($b, [BitConverter]::ToInt32($b, 0x3C) + 4)
+          "gearwise.exe machine type: 0x{0:X4}" -f $machine
+          if ($machine -ne ${{ matrix.machine }}) { throw ("gearwise.exe is machine 0x{0:X4}, expected ${{ matrix.machine }}" -f $machine) }
+          # What is in the zip is what runs: unpack it and start it.
+          Expand-Archive "dist/gearwise-$env:VERSION-windows-${{ matrix.arch }}.zip" -DestinationPath "$env:RUNNER_TEMP\unzipped"
+          $p = Start-Process "$env:RUNNER_TEMP\unzipped\gearwise.exe" -ArgumentList '--version' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "gearwise.exe --version exited with $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
+          name: windows-${{ matrix.arch }}
           path: dist/*
+          if-no-files-found: error
 
-  publish:
+  checksums:
+    name: release notes and SHA256SUMS
     needs: [linux, windows]
     runs-on: ubuntu-latest
     steps:
@@ -66,22 +162,62 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            v=${GITHUB_REF_NAME#v}
+          else
+            v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Every platform delivered its package
+        run: |
+          ls -l dist
+          for f in \
+            gearwise-$VERSION-linux-x86_64.tar.gz gearwise-$VERSION-linux-aarch64.tar.gz \
+            gearwise_${VERSION}_amd64.deb gearwise_${VERSION}_arm64.deb \
+            gearwise-$VERSION-windows-x86_64.zip gearwise-$VERSION-windows-aarch64.zip; do
+            test -f "dist/$f" || { echo "missing $f"; exit 1; }
+          done
+          test "$(ls dist | wc -l)" -eq 6
       - name: Release notes from the changelog
         run: |
-          v=${GITHUB_REF_NAME#v}
-          awk -v v="$v" '$0 ~ "^## " v {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
-          cat >> notes.md <<'MD'
+          mkdir meta
+          awk -v v="$VERSION" '$0 ~ "^## " v {on=1; next} /^## / && on {exit} on' CHANGELOG.md > meta/notes.md
+          cat >> meta/notes.md <<'MD'
 
           ### Install
 
           - **Ubuntu (PPA):** `sudo add-apt-repository ppa:dhiva-labs/apps && sudo apt install gearwise`
-          - **Debian/Ubuntu (.deb):** download `gearwise_*_amd64.deb` below and `sudo apt install ./gearwise_*_amd64.deb`
-          - **Any Linux:** extract the tarball, run `sudo ./install-udev-rules.sh` once, then `./gearwise`
-          - **Windows:** extract the zip and run `gearwise.exe` (close G HUB / Synapse / iCUE / GG first)
+          - **Debian/Ubuntu (.deb):** download `gearwise_*_amd64.deb` (x86-64) or `gearwise_*_arm64.deb` (Arm64) below and `sudo apt install ./gearwise_*.deb`
+          - **Any Linux:** extract `gearwise-*-linux-x86_64.tar.gz` or `gearwise-*-linux-aarch64.tar.gz`, run `sudo ./install-udev-rules.sh` once, then `./gearwise`
+          - **Windows:** extract `gearwise-*-windows-x86_64.zip` (most PCs) or `gearwise-*-windows-aarch64.zip` (Windows on Arm) and run `gearwise.exe` (close G HUB / Synapse / iCUE / GG first)
           MD
       - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS
+        run: cd dist && sha256sum * | tee ../meta/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-meta
+          path: meta/*
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    if: github.ref_type == 'tag'
+    needs: checksums
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Gearwise ${GITHUB_REF_NAME#v}" --notes-file notes.md
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mv dist/notes.md notes.md
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* --title "Gearwise ${GITHUB_REF_NAME#v}" --notes-file notes.md
