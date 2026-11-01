@@ -5,6 +5,7 @@
 [![ARM64 builds](https://github.com/Dhiva-Labs/gearwise/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/gearwise/actions/workflows/ci.yml)
 ![Linux x64 | arm64](https://img.shields.io/badge/Linux-x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
 ![Windows x64 | arm64](https://img.shields.io/badge/Windows-x64%20%7C%20arm64-informational?logo=windows&logoColor=white)
+![Linux: deb | rpm | Arch | AppImage | Snap](https://img.shields.io/badge/Linux-deb%20%7C%20rpm%20%7C%20Arch%20%7C%20AppImage%20%7C%20Snap-informational?logo=linux&logoColor=white)
 
 One lightweight app to configure gaming mice and keyboards from **Logitech,
 Razer, Corsair and SteelSeries** on **Linux and Windows** (x64 and Arm64) — DPI stages,
@@ -109,6 +110,49 @@ Download from the [latest release](https://github.com/Dhiva-Labs/gearwise/releas
 
 Linux builds need glibc 2.35+ (Ubuntu 22.04 or newer), on x86-64 or Arm64
 (aarch64). Every release also lists a `SHA256SUMS` file for all packages.
+
+### Fedora, openSUSE, Arch and AppImage
+
+From the next release on, releases also carry these, for x64 and Arm64, all
+repackaged from the same build as the `.deb`:
+
+| | x64 (x86-64) | Arm64 (aarch64) |
+|---|---|---|
+| Fedora / RHEL / openSUSE | `gearwise-*-1.x86_64.rpm` | `gearwise-*-1.aarch64.rpm` |
+| Arch / Manjaro / EndeavourOS | `gearwise-*-1-x86_64.pkg.tar.zst` | `gearwise-*-1-aarch64.pkg.tar.zst` |
+| Any glibc Linux (AppImage) | `Gearwise-*-x86_64.AppImage` | `Gearwise-*-aarch64.AppImage` |
+| AUR recipe (`gearwise-bin`) | `gearwise-bin-*-aur.tar.gz` | (same file) |
+
+* Fedora / RHEL → `sudo dnf install ./gearwise-*.x86_64.rpm`
+* openSUSE → `sudo zypper install --allow-unsigned-rpm ./gearwise-*.x86_64.rpm`
+  (the `.rpm` is not signed)
+* Arch → `sudo pacman -U ./gearwise-*-x86_64.pkg.tar.zst`; `gearwise-bin` on
+  the AUR once it is published (until then, `makepkg -si` in the unpacked
+  `gearwise-bin-*-aur.tar.gz`)
+* AppImage → `chmod +x Gearwise-*-x86_64.AppImage && ./Gearwise-*-x86_64.AppImage`
+
+The `.rpm` and Arch packages install the udev rule to
+`/usr/lib/udev/rules.d/70-gearwise.rules` and reload udev, like the `.deb`.
+**The AppImage cannot install the rule**: run `sudo ./install-udev-rules.sh`
+from the tarball once, or copy the rule out of the AppImage:
+
+```bash
+./Gearwise-*-x86_64.AppImage --appimage-extract usr/lib/udev/rules.d/70-gearwise.rules
+sudo install -m644 squashfs-root/usr/lib/udev/rules.d/70-gearwise.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+The AppImage uses the desktop's own OpenGL/EGL, X11 or Wayland and
+xkbcommon libraries, and needs glibc 2.35+ like the other builds. CI
+installs the `.rpm` on Fedora and openSUSE Tumbleweed, the Arch package on
+Arch Linux (x64; Arch has no official Arm64 image, so the Arm64 package gets
+a static check) and the AppImage on Fedora, and runs the screenshot tour
+against each under Xvfb.
+
+There is no Flatpak: a sandbox cannot install the udev rule the devices
+need, it would need `--device=all` (no device sandboxing left), and it
+hides the other processes on the desktop, so per-application profiles could
+not tell which app has focus.
 
 ### Snap Store
 
