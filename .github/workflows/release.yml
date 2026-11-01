@@ -152,9 +152,103 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  # Repackages each architecture's .deb for Fedora/RHEL/openSUSE (.rpm), Arch
+  # (.pkg.tar.zst) and any glibc distribution (AppImage), so every format
+  # ships the same binary, then installs each one on the real distribution
+  # and runs the screenshot tour there. No Flatpak: the sandbox cannot install
+  # the udev rule the devices need, would need --device=all anyway, and hides
+  # host processes, so per-application profiles could not work.
+  distros:
+    name: rpm + Arch + AppImage ${{ matrix.arch }}
+    needs: [linux]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, deb: amd64, nfpm_arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, deb: arm64, nfpm_arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      NFPM_VERSION: '2.48.0'
+      APPIMAGETOOL_VERSION: '1.9.1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            v=${GITHUB_REF_NAME#v}
+          else
+            v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: deb
+      - name: Install nfpm and appimagetool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          tarball="nfpm_${NFPM_VERSION}_Linux_${{ matrix.nfpm_arch }}.tar.gz"
+          gh release download "v$NFPM_VERSION" -R goreleaser/nfpm -p "$tarball" -p checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" nfpm
+          gh release download "$APPIMAGETOOL_VERSION" -R AppImage/appimagetool \
+            -p "appimagetool-${{ matrix.arch }}.AppImage" -O appimagetool
+          chmod +x appimagetool
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Build .rpm, Arch package and AppImage
+        run: |
+          dpkg-deb -x "deb/gearwise_${VERSION}_${{ matrix.deb }}.deb" "$RUNNER_TEMP/root"
+          packaging/linux-distros/pack.sh "$RUNNER_TEMP/root" ${{ matrix.deb }} dist
+      - name: Install and run on Fedora, openSUSE and Arch
+        run: packaging/linux-distros/verify.sh dist ${{ matrix.deb }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distros-${{ matrix.arch }}
+          path: |
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+            dist/*.AppImage
+          if-no-files-found: error
+
+  # AUR recipe: PKGBUILD + .SRCINFO + gearwise.install for gearwise-bin,
+  # rendered with this build's checksums and proven with makepkg on
+  # archlinux:latest.
+  aur:
+    name: AUR PKGBUILD
+    needs: [linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            v=${GITHUB_REF_NAME#v}
+          else
+            v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*
+          path: debs
+          merge-multiple: true
+      - name: Render and check the PKGBUILD
+        run: packaging/arch/aur.sh "debs/gearwise_${VERSION}_amd64.deb" "debs/gearwise_${VERSION}_arm64.deb" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aur
+          path: dist/*-aur.tar.gz
+          if-no-files-found: error
+
   checksums:
     name: release notes and SHA256SUMS
-    needs: [linux, windows]
+    needs: [linux, windows, distros, aur]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,10 +270,14 @@ jobs:
           for f in \
             gearwise-$VERSION-linux-x86_64.tar.gz gearwise-$VERSION-linux-aarch64.tar.gz \
             gearwise_${VERSION}_amd64.deb gearwise_${VERSION}_arm64.deb \
-            gearwise-$VERSION-windows-x86_64.zip gearwise-$VERSION-windows-aarch64.zip; do
+            gearwise-$VERSION-windows-x86_64.zip gearwise-$VERSION-windows-aarch64.zip \
+            gearwise-$VERSION-1.x86_64.rpm gearwise-$VERSION-1.aarch64.rpm \
+            gearwise-$VERSION-1-x86_64.pkg.tar.zst gearwise-$VERSION-1-aarch64.pkg.tar.zst \
+            Gearwise-$VERSION-x86_64.AppImage Gearwise-$VERSION-aarch64.AppImage \
+            gearwise-bin-$VERSION-aur.tar.gz; do
             test -f "dist/$f" || { echo "missing $f"; exit 1; }
           done
-          test "$(ls dist | wc -l)" -eq 6
+          test "$(ls dist | wc -l)" -eq 13
       - name: Release notes from the changelog
         run: |
           mkdir meta
@@ -190,6 +288,9 @@ jobs:
 
           - **Ubuntu (PPA):** `sudo add-apt-repository ppa:dhiva-labs/apps && sudo apt install gearwise`
           - **Debian/Ubuntu (.deb):** download `gearwise_*_amd64.deb` (x86-64) or `gearwise_*_arm64.deb` (Arm64) below and `sudo apt install ./gearwise_*.deb`
+          - **Fedora/RHEL (.rpm):** `sudo dnf install ./gearwise-*.x86_64.rpm` (or `.aarch64.rpm`); **openSUSE:** `sudo zypper install --allow-unsigned-rpm ./gearwise-*.x86_64.rpm`
+          - **Arch (.pkg.tar.zst):** `sudo pacman -U ./gearwise-*-x86_64.pkg.tar.zst` (or `-aarch64`); the AUR recipe for `gearwise-bin` is in `gearwise-bin-*-aur.tar.gz`
+          - **AppImage (any glibc 2.35+ Linux):** `chmod +x Gearwise-*-x86_64.AppImage && ./Gearwise-*-x86_64.AppImage` (or `-aarch64`); install the udev rule once with `install-udev-rules.sh` from the tarball
           - **Any Linux:** extract `gearwise-*-linux-x86_64.tar.gz` or `gearwise-*-linux-aarch64.tar.gz`, run `sudo ./install-udev-rules.sh` once, then `./gearwise`
           - **Windows:** extract `gearwise-*-windows-x86_64.zip` (most PCs) or `gearwise-*-windows-aarch64.zip` (Windows on Arm) and run `gearwise.exe` (close G HUB / Synapse / iCUE / GG first)
           MD

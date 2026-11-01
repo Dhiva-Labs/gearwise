@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added: packages for more Linux distributions, for x64 and Arm64, all
+  repackaged from the `.deb` build: `.rpm` for Fedora, RHEL and openSUSE,
+  `.pkg.tar.zst` for Arch Linux (both install the udev rule and reload udev),
+  an AppImage, and an AUR `gearwise-bin` PKGBUILD. CI installs each one on its
+  distribution and runs the screenshot tour there.
+
 ## 0.1.1 — 2026-10-16
 
 - Added: Linux arm64 and Windows arm64 builds next to x64:
