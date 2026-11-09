@@ -13,6 +13,8 @@ report rate, RGB lighting (zones and per-key), button assignments, onboard
 profiles, macros and per-application profiles. An open alternative to
 G HUB, Synapse, iCUE and GG that ships as a single small native binary.
 
+**Documentation:** step-by-step guides at [learn.dhivalabs.com](https://learn.dhivalabs.com/apps/gearwise/): [install](https://learn.dhivalabs.com/apps/gearwise/install) · [beginner guide](https://learn.dhivalabs.com/apps/gearwise/getting-started) · [troubleshooting](https://learn.dhivalabs.com/apps/gearwise/faq).
+
 ![Button assignments on a real G502 HERO, read from its onboard memory](app/screenshots/00-real-g502-hero.png)
 
 | | |
