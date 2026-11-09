@@ -23,7 +23,9 @@ description: |
 
   Then unplug and replug your devices. Close G HUB, Synapse, iCUE or GG if
   they run in a VM or Wine prefix.
-website: https://github.com/Dhiva-Labs/gearwise
+website:
+  - https://github.com/Dhiva-Labs/gearwise
+  - https://learn.dhivalabs.com/apps/gearwise/
 source-code: https://github.com/Dhiva-Labs/gearwise
 issues: https://github.com/Dhiva-Labs/gearwise/issues
 license: MIT
